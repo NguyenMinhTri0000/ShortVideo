@@ -8,6 +8,7 @@ import {
   Lightbulb,
   PlayCircle,
   Video,
+  ShoppingBag,
   Settings,
   Terminal,
   ChevronLeft,
@@ -39,6 +40,7 @@ export default function Sidebar() {
 
   const menuItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Sản phẩm (Affiliate)", href: "/products", icon: ShoppingBag },
     { name: "Ý tưởng (Ideas)", href: "/ideas", icon: Lightbulb },
     { name: "Hàng đợi (Jobs)", href: "/jobs", icon: PlayCircle },
     { name: "Thư viện Video", href: "/videos", icon: Video },

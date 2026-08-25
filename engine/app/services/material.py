@@ -1,12 +1,15 @@
 import os
 import random
+import shutil
 import threading
 from typing import List
 from urllib.parse import urlencode
 
 import requests
 from loguru import logger
+from moviepy import ImageClip
 from moviepy.video.io.VideoFileClip import VideoFileClip
+from PIL import Image
 
 from app.config import config
 from app.models.schema import MaterialInfo, VideoAspect, VideoConcatMode
@@ -470,7 +473,97 @@ def _download_videos_by_script_order(
     return video_paths
 
 
+def process_product_images(
+    task_id: str,
+    images: List[str],
+    video_aspect: VideoAspect = VideoAspect.portrait,
+) -> List[str]:
+    """
+    Tải hoặc đọc danh sách hình ảnh sản phẩm, biến chúng thành các video clip ngắn (3s)
+    và lưu vào thư mục task storage.
+    """
+    if not images:
+        return []
+
+    aspect = VideoAspect(video_aspect)
+    width, height = aspect.to_resolution()
+
+    task_dir = utils.task_dir(task_id)
+    product_clips = []
+
+    for idx, img_src in enumerate(images):
+        if not img_src or not isinstance(img_src, str):
+            continue
+
+        local_img_path = os.path.join(task_dir, f"prod_img_{idx}.jpg")
+        output_clip_path = os.path.join(task_dir, f"prod_clip_{idx}.mp4")
+
+        # Download if HTTP URL
+        if img_src.startswith(("http://", "https://")):
+            try:
+                r = requests.get(img_src, timeout=15, verify=_get_tls_verify())
+                if r.status_code == 200:
+                    with open(local_img_path, "wb") as f:
+                        f.write(r.content)
+                else:
+                    logger.warning(f"failed download image HTTP {r.status_code}: {img_src}")
+                    continue
+            except Exception as e:
+                logger.warning(f"failed to download product image {img_src}: {e}")
+                continue
+        elif os.path.isfile(img_src):
+            try:
+                shutil.copy(img_src, local_img_path)
+            except Exception:
+                continue
+        else:
+            continue
+
+        if not os.path.exists(local_img_path):
+            continue
+
+        try:
+            # Resize image with Pillow and pad to target resolution (e.g. 1080x1920)
+            with Image.open(local_img_path) as img:
+                img = img.convert("RGB")
+                img_ratio = img.width / img.height
+                target_ratio = width / height
+
+                if img_ratio > target_ratio:
+                    new_w = width
+                    new_h = int(width / img_ratio)
+                else:
+                    new_h = height
+                    new_w = int(height * img_ratio)
+
+                resized_img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                canvas = Image.new("RGB", (width, height), (0, 0, 0))
+                paste_x = (width - new_w) // 2
+                paste_y = (height - new_h) // 2
+                canvas.paste(resized_img, (paste_x, paste_y))
+                canvas.save(local_img_path, "JPEG", quality=95)
+
+            clip = ImageClip(local_img_path).with_duration(3.0)
+            clip.write_videofile(
+                output_clip_path,
+                fps=30,
+                codec="libx264",
+                audio=False,
+                logger=None,
+            )
+            clip.close()
+
+            if os.path.exists(output_clip_path):
+                product_clips.append(output_clip_path)
+        except Exception as e:
+            logger.error(f"failed to convert product image to video clip: {e}")
+
+    logger.info(f"processed {len(product_clips)} product image clips for task {task_id}")
+    return product_clips
+
+
 if __name__ == "__main__":
     download_videos(
         "test123", ["Money Exchange Medium"], audio_duration=100, source="pixabay"
     )
+

@@ -31,7 +31,7 @@ const LLM_PROVIDERS = [
     description: "Gemini 2.5 Flash / Pro",
     apiKeyField: "gemini_api_key",
     modelField: "gemini_model_name",
-    defaultModel: "gemini-2.5-flash",
+    defaultModel: "gemini-3.6-flash",
     keyPlaceholder: "AIza…",
     keyHint: "aistudio.google.com",
     color: "text-blue-400",

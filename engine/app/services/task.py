@@ -23,6 +23,7 @@ def generate_script(task_id, params):
             paragraph_number=params.paragraph_number,
             video_script_prompt=params.video_script_prompt,
             custom_system_prompt=params.custom_system_prompt,
+            product_data=getattr(params, "product_data", None),
         )
     else:
         logger.debug(f"video script: \n{video_script}")
@@ -234,18 +235,29 @@ def generate_subtitle(task_id, params, video_script, sub_maker, audio_file):
 
 
 def get_video_materials(task_id, params, video_terms, audio_duration):
+    product_clips = []
+    product_data = getattr(params, "product_data", None)
+    if isinstance(product_data, dict) and product_data.get("images"):
+        logger.info("\n\n## processing product images for affiliate video")
+        product_clips = material.process_product_images(
+            task_id=task_id,
+            images=product_data.get("images", []),
+            video_aspect=params.video_aspect,
+        )
+
     if params.video_source == "local":
         logger.info("\n\n## preprocess local materials")
         materials = video.preprocess_video(
             materials=params.video_materials, clip_duration=params.video_clip_duration
         )
-        if not materials:
+        if not materials and not product_clips:
             sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
             logger.error(
                 "no valid materials found, please check the materials and try again."
             )
             return None
-        return [material_info.url for material_info in materials]
+        local_paths = [material_info.url for material_info in materials] if materials else []
+        return product_clips + local_paths
     else:
         logger.info(f"\n\n## downloading videos from {params.video_source}")
         # 顺序匹配模式只在用户显式开启时生效。这里强制素材下载按关键词顺序
@@ -264,12 +276,26 @@ def get_video_materials(task_id, params, video_terms, audio_duration):
             max_clip_duration=params.video_clip_duration,
             match_script_order=params.match_materials_to_script,
         )
-        if not downloaded_videos:
+        if not downloaded_videos and not product_clips:
             sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
             logger.error(
                 "failed to download videos, maybe the network is not available. if you are in China, please use a VPN."
             )
             return None
+
+        if product_clips and downloaded_videos:
+            # Interleave product clips and downloaded B-roll clips
+            mixed_videos = []
+            max_len = max(len(product_clips), len(downloaded_videos))
+            for i in range(max_len):
+                if i < len(product_clips):
+                    mixed_videos.append(product_clips[i])
+                if i < len(downloaded_videos):
+                    mixed_videos.append(downloaded_videos[i])
+            return mixed_videos
+        elif product_clips:
+            return product_clips
+
         return downloaded_videos
 
 

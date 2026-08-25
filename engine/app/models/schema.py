@@ -110,6 +110,7 @@ class VideoParams(BaseModel):
     paragraph_number: int = Field(default=1, ge=1, le=10)
     video_script_prompt: str = Field(default="", max_length=2000)
     custom_system_prompt: str = Field(default="", max_length=8000)
+    product_data: Optional[Any] = None
 
 
 class SubtitleRequest(BaseModel):

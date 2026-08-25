@@ -2,7 +2,7 @@ import json
 import logging
 import re
 import requests
-from typing import List
+from typing import Any, List
 
 from loguru import logger
 from openai import AzureOpenAI, OpenAI
@@ -11,8 +11,8 @@ from openai.types.chat import ChatCompletion
 from app.config import config
 
 _max_retries = 5
-_DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
-_DEPRECATED_GEMINI_MODELS = {"gemini-pro", "gemini-1.0-pro"}
+_DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
+_DEPRECATED_GEMINI_MODELS = {"gemini-pro", "gemini-1.0-pro", "gemini-2.5-flash"}
 MIN_SCRIPT_PARAGRAPH_NUMBER = 1
 MAX_SCRIPT_PARAGRAPH_NUMBER = 10
 MAX_SCRIPT_PROMPT_LENGTH = 2000
@@ -41,6 +41,28 @@ Generate a script for a video, depending on the subject of the video.
 7. you must not mention the prompt, or anything about the script itself. also, never talk about the amount of paragraphs or lines. just write the script.
 8. respond in the same language as the video subject.
 """.strip()
+
+DEFAULT_AFFILIATE_SYSTEM_PROMPT = """
+# Role: Short-Form Affiliate Marketing Video Script Generator
+
+## Goals:
+Generate a high-converting sales video script for an affiliate marketing video.
+
+## Script Structure Flow:
+1. HOOK (0-3s): Attention-grabbing opening statement or curiosity question about a common problem.
+2. PROBLEM (3-8s): Empathize with the target audience's frustration or pain point.
+3. SOLUTION (8-20s): Introduce the product by name and its key solution.
+4. PRODUCT BENEFITS (20-35s): Highlight the main features, benefits, and value of the product.
+5. SOCIAL PROOF / REASON TO BUY (35-45s): Explain why this product is worth buying right now.
+6. CALL TO ACTION (45-55s): Direct viewers to click the link in bio or description to check out the product.
+
+## Constraints:
+1. Return the raw text script only, ready to be read aloud by TTS.
+2. Do NOT include markdown tags (*, #, **), titles, segment labels (such as "HOOK:", "Scene 1:"), or speaker indicators ("Narrator:").
+3. Get straight to the point, write in a compelling, natural conversational voice.
+4. Respond in the specified language (default Vietnamese if specified).
+""".strip()
+
 
 
 def _normalize_text_response(content, llm_provider: str) -> str:
@@ -637,6 +659,7 @@ def build_script_prompt(
     paragraph_number: int = 1,
     video_script_prompt: str = "",
     custom_system_prompt: str = "",
+    product_data: Any = None,
 ) -> str:
     paragraph_number = _normalize_script_paragraph_number(paragraph_number)
     video_script_prompt = _limit_script_text(
@@ -646,15 +669,37 @@ def build_script_prompt(
         custom_system_prompt, MAX_SCRIPT_SYSTEM_PROMPT_LENGTH, "custom_system_prompt"
     )
 
-    # 将“脚本生成规则”和“运行时上下文”分开拼接。这样高级用户即使覆盖默认
-    # system prompt，也不会漏掉视频主题、语言、段落数这些每次生成都必须带上的参数。
-    prompt = custom_system_prompt or DEFAULT_SCRIPT_SYSTEM_PROMPT
+    base_system_prompt = custom_system_prompt
+    if not base_system_prompt:
+        if product_data:
+            base_system_prompt = DEFAULT_AFFILIATE_SYSTEM_PROMPT
+        else:
+            base_system_prompt = DEFAULT_SCRIPT_SYSTEM_PROMPT
+
+    prompt = base_system_prompt
     prompt += f"""
 
 # Initialization:
 - video subject: {video_subject}
 - number of paragraphs: {paragraph_number}
 """.rstrip()
+
+    if product_data:
+        if isinstance(product_data, str):
+            prompt += f"\n\n# Product Data (Affiliate Context):\n{product_data}"
+        elif isinstance(product_data, dict):
+            prompt += f"""
+
+# Product Information:
+- Product Name: {product_data.get('name', video_subject)}
+- Description: {product_data.get('description', '')}
+- Price: {product_data.get('price', '')} {product_data.get('currency', 'VND')}
+- Key Features: {', '.join(product_data.get('features', []))}
+- Key Benefits: {', '.join(product_data.get('benefits', []))}
+- Target Audience: {product_data.get('targetAudience', '')}
+- Affiliate URL: {product_data.get('affiliateUrl', '')}
+""".rstrip()
+
     if language:
         prompt += f"\n- language: {language}"
     if video_script_prompt:
@@ -673,6 +718,7 @@ def generate_script(
     paragraph_number: int = 1,
     video_script_prompt: str = "",
     custom_system_prompt: str = "",
+    product_data: Any = None,
 ) -> str:
     paragraph_number = _normalize_script_paragraph_number(paragraph_number)
     video_script_prompt = _limit_script_text(
@@ -687,6 +733,7 @@ def generate_script(
         paragraph_number=paragraph_number,
         video_script_prompt=video_script_prompt,
         custom_system_prompt=custom_system_prompt,
+        product_data=product_data,
     )
     final_script = ""
     logger.info(

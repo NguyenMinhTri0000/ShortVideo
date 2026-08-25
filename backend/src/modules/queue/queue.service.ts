@@ -15,6 +15,7 @@ export type VideoJobConfig = {
   font_size?: number;
   stroke_color?: string;
   stroke_width?: number;
+  productId?: string;
 };
 
 export type VideoJobPayload = {
@@ -24,6 +25,7 @@ export type VideoJobPayload = {
   script?: string;
   language: string;
   config: VideoJobConfig;
+  productId?: string;
 };
 
 @Injectable()

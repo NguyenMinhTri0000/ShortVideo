@@ -60,6 +60,30 @@ export class VideoProcessor extends WorkerHost {
     const engineDir = path.join(projectRoot, 'engine');
     const taskStorageDir = path.join(engineDir, 'storage', 'tasks', jobId);
 
+    // Fetch product if associated with job or idea
+    const targetProductId = config.productId || (await this.prisma.generationJob.findUnique({ where: { id: jobId }, select: { productId: true, idea: { select: { productId: true } } } }))?.productId || (await this.prisma.generationJob.findUnique({ where: { id: jobId }, select: { idea: { select: { productId: true } } } }))?.idea?.productId;
+
+    let productDataJson: string | null = null;
+    if (targetProductId) {
+      const product = await this.prisma.product.findUnique({
+        where: { id: targetProductId },
+      });
+      if (product) {
+        productDataJson = JSON.stringify({
+          id: product.id,
+          name: product.name,
+          description: product.description || '',
+          price: product.price || '',
+          currency: product.currency || 'VND',
+          affiliateUrl: product.affiliateUrl || '',
+          features: product.features || [],
+          benefits: product.benefits || [],
+          targetAudience: product.targetAudience || '',
+          images: product.images || [],
+        });
+      }
+    }
+
     // Build args
     const args = [
       'engine/cli.py',
@@ -69,6 +93,9 @@ export class VideoProcessor extends WorkerHost {
       jobId,
     ];
 
+    if (productDataJson) {
+      args.push('--product-data', productDataJson);
+    }
     if (script) {
       args.push('--video-script', script);
     }

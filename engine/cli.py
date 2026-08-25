@@ -241,6 +241,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="enable rounded translucent subtitle background",
     )
     parser.add_argument("--task-id", default="", help="custom task id")
+    parser.add_argument("--product-data", default="", help="json string of product details for affiliate video")
     args = parser.parse_args(argv)
 
     if args.video_source == "local" and not (args.video_materials or "").strip():
@@ -317,6 +318,13 @@ def build_video_params(args: argparse.Namespace) -> VideoParams:
         params_kwargs["text_background_color"] = args.subtitle_background_color
     elif args.subtitle_background_enabled is True:
         params_kwargs["text_background_color"] = True
+
+    if getattr(args, "product_data", None):
+        try:
+            params_kwargs["product_data"] = json.loads(args.product_data)
+        except Exception as exc:
+            logger.warning(f"failed to parse product_data JSON: {exc}")
+            params_kwargs["product_data"] = args.product_data
 
     return VideoParams(**params_kwargs)
 

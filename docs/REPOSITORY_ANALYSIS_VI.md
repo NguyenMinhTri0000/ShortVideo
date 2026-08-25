@@ -953,3 +953,34 @@ Dưới đây là bảng giải thích ngắn gọn 5 hàm quan trọng nhất t
    - Hàm `load_config()` trong `engine/app/config/config.py` sẽ tự động copy `config.example.toml` thành `config.toml` nếu chưa tồn tại. Tuy nhiên, nếu file `config.toml` chưa được điền `gemini_api_key` hoặc `pexels_api_keys`, Python CLI sẽ báo lỗi ngay khi bắt đầu nhiệm vụ.
 3. **Giới hạn số lượng truy vấn Pexels Free Tier:**
    - API Key miễn phí của Pexels bị giới hạn 200 requests/giờ. Nếu sinh video hàng loạt với số lượng lớn trong hệ thống Affiliate, nên cấu hình mảng nhiều API Keys trong `pexels_api_keys = ["key1", "key2"]` để hệ thống tự xoay vòng key (codebase ở `material.py` đã hỗ trợ sẵn cơ chế xoay vòng key này qua biến `_api_key_counter`).
+
+---
+
+## Implemented Affiliate MVP
+
+Đã triển khai thành công MVP Hệ thống Affiliate Short Video Generator trên codebase hiện tại theo đúng thiết kế 12 Phases:
+
+### 1. Files Added & Modified
+- **Database (`backend/prisma/schema.prisma`):**
+  - Thêm model `Product` (`id`, `name`, `description`, `price`, `currency`, `affiliateUrl`, `features`, `benefits`, `targetAudience`, `images`, `createdAt`, `updatedAt`).
+  - Thêm quan hệ optional `productId` vào model `Idea` và `GenerationJob`.
+- **Backend Service (`backend/src/modules/products/`):**
+  - `products.module.ts`: Khai báo module sản phẩm.
+  - `products.service.ts`: Xử lý CRUD sản phẩm & hàm `generateVideo(id, config)` kết nối với Queue.
+  - `products.controller.ts`: Cung cấp các API endpoint `POST /api/products`, `GET /api/products`, `GET /api/products/:id`, `PATCH /api/products/:id`, `DELETE /api/products/:id`, `POST /api/products/:id/generate-video`.
+  - `backend/src/app.module.ts`: Đăng ký `ProductsModule`.
+  - `backend/src/modules/queue/queue.service.ts`: Bổ sung `productId` vào `VideoJobConfig` và `VideoJobPayload`.
+  - `backend/src/modules/queue/video.processor.ts`: Đọc dữ liệu `Product` từ DB và truyền `--product-data` dưới dạng JSON sang Python CLI.
+- **Frontend Dashboard (`frontend/`):**
+  - `frontend/src/components/Sidebar.tsx`: Thêm mục "Sản phẩm (Affiliate)" dẫn đến `/products`.
+  - `frontend/src/app/products/page.tsx`: Màn hình Quản lý Sản phẩm Affiliate, hiển thị danh sách dạng Card, xem link affiliate, xóa sản phẩm, Modal thêm sản phẩm mới và nút "Tạo Video 9:16" trực tiếp.
+- **Python Engine (`engine/`):**
+  - `engine/app/models/schema.py`: Bổ sung trường `product_data` vào dataclass `VideoParams`.
+  - `engine/cli.py`: Bổ sung tham số `--product-data` vào ArgumentParser và xử lý parse JSON trong `build_video_params()`.
+  - `engine/app/services/llm.py`: Thêm `DEFAULT_AFFILIATE_SYSTEM_PROMPT` với cấu trúc kịch bản bán hàng chuẩn (HOOK 0-3s -> PROBLEM 3-8s -> SOLUTION 8-20s -> BENEFITS 20-35s -> REASON 35-45s -> CTA 45-55s). Cập nhật `build_script_prompt()` và `generate_script()` tự động sử dụng Affiliate Prompt khi có `product_data`.
+  - `engine/app/services/material.py`: Thêm hàm `process_product_images()` tự động tải URL ảnh sản phẩm (hoặc file local), crop/pad thành khổ 9:16 và chuyển đổi thành các clip video ngắn (3s).
+  - `engine/app/services/task.py`: Cập nhật `generate_script()` truyền `product_data` sang LLM và `get_video_materials()` trộn lẫn clip hình ảnh sản phẩm với video B-roll Pexels/Pixabay.
+
+### 2. Backward Compatibility
+- Tính năng tạo video bằng **Topic đơn thuần (Topic-only generation)** giữ nguyên 100%. Khi không truyền `productId` hoặc `product_data`, hệ thống tự động sử dụng luồng sinh video cũ không có bất kỳ ảnh hưởng nào.
+

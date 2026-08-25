@@ -8,6 +8,7 @@ import { IdeasModule } from './modules/ideas/ideas.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { VideosModule } from './modules/videos/videos.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { ProductsModule } from './modules/products/products.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     JobsModule,
     VideosModule,
     SettingsModule,
+    ProductsModule,
   ],
 })
 export class AppModule {}

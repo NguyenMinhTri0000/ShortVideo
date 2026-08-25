@@ -103,7 +103,7 @@ export class LlmService {
       apiKey,
       model: modelKey
         ? await this.getSetting(modelKey, '')
-        : await this.getSetting('llm_model', 'gemini-2.5-flash'),
+        : await this.getSetting('llm_model', 'gemini-3.6-flash'),
     };
   }
 
