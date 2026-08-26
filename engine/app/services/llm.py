@@ -2,7 +2,7 @@ import json
 import logging
 import re
 import requests
-from typing import Any, List
+from typing import Any, List, Optional
 
 from loguru import logger
 from openai import AzureOpenAI, OpenAI
@@ -809,7 +809,20 @@ def generate_terms(
     video_script: str,
     amount: int = 5,
     match_script_order: bool = False,
+    product_data: Optional[Any] = None,
 ) -> List[str]:
+    is_product_video = bool(product_data)
+    product_guidance = ""
+
+    if is_product_video:
+        product_guidance = (
+            "7. IMPORTANT FOR PRODUCT AFFILIATE VIDEO: The search terms must represent SUPPORTING VISUALS "
+            "(usage context, environment, cooking/kitchen/lifestyle actions, background mood). "
+            "DO NOT search for competing product models, generic hardware, or unrelated appliance brands. "
+            "For example, if the product is an air fryer, search terms should be 'kitchen cooking', "
+            "'preparing healthy meal', 'food plate' - NOT other air fryers or unrelated products."
+        )
+
     if match_script_order:
         goal = (
             f"Generate {amount} chronological stock-video search terms that follow "
@@ -819,8 +832,6 @@ def generate_terms(
             "6. keep the terms in the same order as the script narration; "
             "earlier terms must describe earlier visual moments."
         )
-        # 有序关键词模式下，示例数量要和 amount 保持一致，避免模型被固定
-        # 的 4 个示例误导，导致长文案只返回少量关键词，影响素材覆盖度。
         example_terms = [
             "opening visual topic",
             *[
@@ -849,11 +860,12 @@ def generate_terms(
 
 ## Constrains:
 1. the search terms are to be returned as a json-array of strings.
-2. each search term should consist of 1-3 words, always add the main subject of the video.
+2. each search term should consist of 1-3 words.
 3. you must only return the json-array of strings. you must not return anything else. you must not return the script.
 4. the search terms must be related to the subject of the video.
 5. reply with english search terms only.
 {ordering_rule}
+{product_guidance}
 
 ## Output Example:
 {output_example}

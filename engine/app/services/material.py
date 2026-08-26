@@ -473,15 +473,129 @@ def _download_videos_by_script_order(
     return video_paths
 
 
+def _create_motion_clip_from_image(
+    local_img_path: str,
+    output_clip_path: str,
+    width: int,
+    height: int,
+    motion_type: str = "zoom_in",
+    clip_duration: float = 3.0,
+) -> bool:
+    try:
+        from PIL import ImageEnhance, ImageFilter
+        from moviepy import CompositeVideoClip, ImageClip
+
+        if "IMAGEIO_FFMPEG_EXE" not in os.environ:
+            os.environ["IMAGEIO_FFMPEG_EXE"] = utils.get_ffmpeg_binary()
+
+        # 1. Prepare base image canvas with aspect ratio preservation & ambient background
+        with Image.open(local_img_path) as img:
+            img = img.convert("RGB")
+            img_ratio = img.width / img.height
+            target_ratio = width / height
+
+            if img_ratio > target_ratio:
+                new_w = width
+                new_h = max(1, int(width / img_ratio))
+            else:
+                new_h = height
+                new_w = max(1, int(height * img_ratio))
+
+            resized_fg = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+            # Ambient background canvas (blurred & darkened version of image)
+            bg_img = img.resize((width, height), Image.Resampling.BILINEAR)
+            if hasattr(ImageFilter, "GaussianBlur"):
+                bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=20))
+
+            enhancer = ImageEnhance.Brightness(bg_img)
+            canvas = enhancer.enhance(0.4)
+
+            # Paste product image centered on ambient background
+            paste_x = (width - new_w) // 2
+            paste_y = (height - new_h) // 2
+            canvas.paste(resized_fg, (paste_x, paste_y))
+
+            temp_framed_path = output_clip_path + ".framed.jpg"
+            canvas.save(temp_framed_path, "JPEG", quality=95)
+
+        # 2. Build MoviePy clip with dynamic motion
+        clip = ImageClip(temp_framed_path).with_duration(clip_duration).with_position("center")
+
+        if motion_type == "zoom_in":
+            motion_clip = clip.resized(lambda t: 1.0 + 0.12 * (t / clip_duration))
+        elif motion_type == "zoom_out":
+            motion_clip = clip.resized(lambda t: 1.15 - 0.12 * (t / clip_duration))
+        elif motion_type == "detail_zoom":
+            motion_clip = clip.resized(lambda t: 1.18 + 0.10 * (t / clip_duration))
+        elif motion_type == "pan_left":
+            scaled = clip.resized(1.12)
+            offset = int(width * 0.06)
+            motion_clip = scaled.with_position(
+                lambda t: (int(offset / 2 - offset * (t / clip_duration)), "center")
+            )
+        elif motion_type == "pan_right":
+            scaled = clip.resized(1.12)
+            offset = int(width * 0.06)
+            motion_clip = scaled.with_position(
+                lambda t: (int(-offset / 2 + offset * (t / clip_duration)), "center")
+            )
+        elif motion_type == "pan_up":
+            scaled = clip.resized(1.12)
+            offset = int(height * 0.06)
+            motion_clip = scaled.with_position(
+                lambda t: ("center", int(offset / 2 - offset * (t / clip_duration)))
+            )
+        elif motion_type == "subtle_float":
+            scaled = clip.resized(lambda t: 1.0 + 0.08 * (t / clip_duration))
+            motion_clip = scaled.with_position(
+                lambda t: (int(-(width * 0.02) * (t / clip_duration)), "center")
+            )
+        else:
+            motion_clip = clip.resized(lambda t: 1.0 + 0.10 * (t / clip_duration))
+
+        final_clip = CompositeVideoClip([motion_clip], size=(width, height))
+        final_clip.write_videofile(
+            output_clip_path,
+            fps=30,
+            codec="libx264",
+            audio=False,
+            logger=None,
+        )
+
+        try:
+            if hasattr(clip, "close"):
+                clip.close()
+            if hasattr(final_clip, "close"):
+                final_clip.close()
+        except Exception:
+            pass
+
+        if os.path.exists(temp_framed_path):
+            try:
+                os.remove(temp_framed_path)
+            except Exception:
+                pass
+
+        return os.path.exists(output_clip_path)
+    except Exception as e:
+        logger.error(f"failed to generate motion clip ({motion_type}) from {local_img_path}: {e}")
+        return False
+
+
 def process_product_images(
     task_id: str,
     images: List[str],
     video_aspect: VideoAspect = VideoAspect.portrait,
+    target_p0_duration: float = 0.0,
+    clip_duration: float = 3.0,
 ) -> List[str]:
     """
-    Tải hoặc đọc danh sách hình ảnh sản phẩm, biến chúng thành các video clip ngắn (3s)
-    và lưu vào thư mục task storage.
+    Download/load product images and convert them into dynamic motion video clips (P0 Product Visuals).
+    Applies zoom, pan, float, and detail focus effects to ensure non-static visual dominance.
     """
+    import math
+
     if not images:
         return []
 
@@ -489,14 +603,13 @@ def process_product_images(
     width, height = aspect.to_resolution()
 
     task_dir = utils.task_dir(task_id)
-    product_clips = []
+    valid_local_images = []
 
     for idx, img_src in enumerate(images):
         if not img_src or not isinstance(img_src, str):
             continue
 
         local_img_path = os.path.join(task_dir, f"prod_img_{idx}.jpg")
-        output_clip_path = os.path.join(task_dir, f"prod_clip_{idx}.mp4")
 
         # Download if HTTP URL
         if img_src.startswith(("http://", "https://")):
@@ -505,60 +618,65 @@ def process_product_images(
                 if r.status_code == 200:
                     with open(local_img_path, "wb") as f:
                         f.write(r.content)
+                    valid_local_images.append(local_img_path)
                 else:
                     logger.warning(f"failed download image HTTP {r.status_code}: {img_src}")
-                    continue
             except Exception as e:
                 logger.warning(f"failed to download product image {img_src}: {e}")
-                continue
         elif os.path.isfile(img_src):
             try:
                 shutil.copy(img_src, local_img_path)
+                valid_local_images.append(local_img_path)
             except Exception:
-                continue
+                pass
+
+    if not valid_local_images:
+        return []
+
+    # Determine required clip count to satisfy target_p0_duration
+    if target_p0_duration > 0:
+        required_clips = max(
+            len(valid_local_images), int(math.ceil(target_p0_duration / clip_duration))
+        )
+    else:
+        if len(valid_local_images) == 1:
+            required_clips = 4
+        elif len(valid_local_images) <= 3:
+            required_clips = len(valid_local_images) * 2
         else:
-            continue
+            required_clips = len(valid_local_images)
 
-        if not os.path.exists(local_img_path):
-            continue
+    motion_presets = [
+        "zoom_in",
+        "detail_zoom",
+        "pan_left",
+        "pan_right",
+        "zoom_out",
+        "subtle_float",
+        "pan_up",
+    ]
+    product_clips = []
 
-        try:
-            # Resize image with Pillow and pad to target resolution (e.g. 1080x1920)
-            with Image.open(local_img_path) as img:
-                img = img.convert("RGB")
-                img_ratio = img.width / img.height
-                target_ratio = width / height
+    for i in range(required_clips):
+        img_path = valid_local_images[i % len(valid_local_images)]
+        motion_type = motion_presets[i % len(motion_presets)]
+        output_clip_path = os.path.join(task_dir, f"prod_clip_{i}.mp4")
 
-                if img_ratio > target_ratio:
-                    new_w = width
-                    new_h = int(width / img_ratio)
-                else:
-                    new_h = height
-                    new_w = int(height * img_ratio)
+        success = _create_motion_clip_from_image(
+            local_img_path=img_path,
+            output_clip_path=output_clip_path,
+            width=width,
+            height=height,
+            motion_type=motion_type,
+            clip_duration=clip_duration,
+        )
+        if success:
+            product_clips.append(output_clip_path)
 
-                resized_img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-                canvas = Image.new("RGB", (width, height), (0, 0, 0))
-                paste_x = (width - new_w) // 2
-                paste_y = (height - new_h) // 2
-                canvas.paste(resized_img, (paste_x, paste_y))
-                canvas.save(local_img_path, "JPEG", quality=95)
-
-            clip = ImageClip(local_img_path).with_duration(3.0)
-            clip.write_videofile(
-                output_clip_path,
-                fps=30,
-                codec="libx264",
-                audio=False,
-                logger=None,
-            )
-            clip.close()
-
-            if os.path.exists(output_clip_path):
-                product_clips.append(output_clip_path)
-        except Exception as e:
-            logger.error(f"failed to convert product image to video clip: {e}")
-
-    logger.info(f"processed {len(product_clips)} product image clips for task {task_id}")
+    logger.info(
+        f"processed {len(product_clips)} product image clips for task {task_id} "
+        f"(target_p0_duration={target_p0_duration}s)"
+    )
     return product_clips
 
 

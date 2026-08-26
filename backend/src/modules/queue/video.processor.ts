@@ -11,6 +11,19 @@ import ffmpeg from 'fluent-ffmpeg';
 import { type VideoJobPayload } from './queue.service';
 
 export const cancelledJobs = new Set<string>();
+export const activeProcesses = new Map<string, ChildProcessWithoutNullStreams>();
+
+export function killActiveProcess(jobId: string) {
+  const proc = activeProcesses.get(jobId);
+  if (proc) {
+    try {
+      proc.kill('SIGKILL');
+    } catch {
+      // ignore
+    }
+    activeProcesses.delete(jobId);
+  }
+}
 
 type ScriptFile = {
   script?: string;
@@ -256,7 +269,6 @@ export class VideoProcessor extends WorkerHost {
         }
       };
 
-      // Spawn python CLI using uv run
       pyProcess = spawn(
         'uv',
         ['run', '--project', 'engine', 'python', ...args],
@@ -265,6 +277,11 @@ export class VideoProcessor extends WorkerHost {
           env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
         },
       );
+      activeProcesses.set(jobId, pyProcess);
+
+      pyProcess.on('close', () => {
+        activeProcesses.delete(jobId);
+      });
 
       if (pyProcess.stdout) {
         pyProcess.stdout.on('data', (data: Buffer) => {

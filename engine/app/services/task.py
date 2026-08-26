@@ -2,6 +2,7 @@ import math
 import os.path
 import re
 from os import path
+from typing import List
 
 from loguru import logger
 
@@ -234,15 +235,63 @@ def generate_subtitle(task_id, params, video_script, sub_maker, audio_file):
     return subtitle_path
 
 
+def compose_visual_timeline(
+    product_clips: List[str],
+    broll_clips: List[str],
+    audio_duration: float,
+    p0_ratio: float = 0.7,
+) -> List[str]:
+    """
+    Combines P0 product clips and P1/P2 B-roll clips to satisfy visual priority percentages and section mapping.
+    Ensures:
+    1. Hook (beginning clip) is P0 Product Visual.
+    2. CTA (ending clip) is P0 Product Visual hero shot.
+    3. Product visuals dominate configured percentage (60-80%) of total video timeline.
+    """
+    if not product_clips and not broll_clips:
+        return []
+    if not product_clips:
+        return broll_clips
+    if not broll_clips:
+        return product_clips
+
+    total_slots = max(2, int(round(max(audio_duration, 3.0) / 3.0)))
+    timeline = []
+    p0_idx = 0
+    broll_idx = 0
+
+    for slot in range(total_slots):
+        is_hook = (slot == 0)
+        is_cta = (slot == total_slots - 1 and total_slots >= 3)
+        current_p0_ratio = (p0_idx + 1) / (slot + 1)
+
+        if is_hook or is_cta or current_p0_ratio <= p0_ratio:
+            timeline.append(product_clips[p0_idx % len(product_clips)])
+            p0_idx += 1
+        else:
+            timeline.append(broll_clips[broll_idx % len(broll_clips)])
+            broll_idx += 1
+
+    return timeline
+
+
 def get_video_materials(task_id, params, video_terms, audio_duration):
+    p0_ratio, p1_ratio, p2_ratio = (
+        params.get_normalized_visual_ratios()
+        if hasattr(params, "get_normalized_visual_ratios")
+        else (0.7, 0.3, 0.0)
+    )
+
     product_clips = []
     product_data = getattr(params, "product_data", None)
     if isinstance(product_data, dict) and product_data.get("images"):
         logger.info("\n\n## processing product images for affiliate video")
+        target_p0_duration = audio_duration * p0_ratio
         product_clips = material.process_product_images(
             task_id=task_id,
             images=product_data.get("images", []),
             video_aspect=params.video_aspect,
+            target_p0_duration=target_p0_duration,
         )
 
     if params.video_source == "local":
@@ -257,11 +306,23 @@ def get_video_materials(task_id, params, video_terms, audio_duration):
             )
             return None
         local_paths = [material_info.url for material_info in materials] if materials else []
-        return product_clips + local_paths
+        if product_clips and local_paths:
+            return compose_visual_timeline(
+                product_clips=product_clips,
+                broll_clips=local_paths,
+                audio_duration=audio_duration,
+                p0_ratio=p0_ratio,
+            )
+        return product_clips or local_paths
     else:
         logger.info(f"\n\n## downloading videos from {params.video_source}")
-        # 顺序匹配模式只在用户显式开启时生效。这里强制素材下载按关键词顺序
-        # 轮询，避免某个早期关键词下载太多素材，把后续脚本主题挤出最终时间线。
+        # B-roll target duration bounded by supporting ratio if product clips exist
+        target_broll_duration = (
+            audio_duration * (p1_ratio + p2_ratio)
+            if product_clips
+            else audio_duration
+        )
+
         downloaded_videos = material.download_videos(
             task_id=task_id,
             search_terms=video_terms,
@@ -272,27 +333,24 @@ def get_video_materials(task_id, params, video_terms, audio_duration):
                 if params.match_materials_to_script
                 else params.video_concat_mode
             ),
-            audio_duration=audio_duration * params.video_count,
+            audio_duration=target_broll_duration * params.video_count,
             max_clip_duration=params.video_clip_duration,
             match_script_order=params.match_materials_to_script,
         )
         if not downloaded_videos and not product_clips:
             sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
             logger.error(
-                "failed to download videos, maybe the network is not available. if you are in China, please use a VPN."
+                "failed to download videos, maybe the network is not available."
             )
             return None
 
         if product_clips and downloaded_videos:
-            # Interleave product clips and downloaded B-roll clips
-            mixed_videos = []
-            max_len = max(len(product_clips), len(downloaded_videos))
-            for i in range(max_len):
-                if i < len(product_clips):
-                    mixed_videos.append(product_clips[i])
-                if i < len(downloaded_videos):
-                    mixed_videos.append(downloaded_videos[i])
-            return mixed_videos
+            return compose_visual_timeline(
+                product_clips=product_clips,
+                broll_clips=downloaded_videos,
+                audio_duration=audio_duration,
+                p0_ratio=p0_ratio,
+            )
         elif product_clips:
             return product_clips
 

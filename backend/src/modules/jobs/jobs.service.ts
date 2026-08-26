@@ -76,8 +76,12 @@ export class JobsService {
       );
     }
 
-    // Try to remove from BullMQ
-    await this.queueService.cancelJob(id);
+    // Try to remove from BullMQ and kill process
+    try {
+      await this.queueService.cancelJob(id);
+    } catch {
+      // Non-fatal if queue operation fails
+    }
 
     // Update database
     return this.prisma.generationJob.update({

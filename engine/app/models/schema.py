@@ -112,6 +112,21 @@ class VideoParams(BaseModel):
     custom_system_prompt: str = Field(default="", max_length=8000)
     product_data: Optional[Any] = None
 
+    # Visual Priority Ratios (P0: Product, P1: Supporting B-roll, P2: Generic B-roll)
+    product_visual_ratio: float = 0.7
+    supporting_broll_ratio: float = 0.3
+    generic_broll_ratio: float = 0.0
+
+    def get_normalized_visual_ratios(self) -> tuple[float, float, float]:
+        """Returns (p0_ratio, p1_ratio, p2_ratio) normalized so they sum to 1.0"""
+        p0 = max(0.0, float(self.product_visual_ratio))
+        p1 = max(0.0, float(self.supporting_broll_ratio))
+        p2 = max(0.0, float(self.generic_broll_ratio))
+        total = p0 + p1 + p2
+        if total <= 0:
+            return 0.7, 0.3, 0.0
+        return p0 / total, p1 / total, p2 / total
+
 
 class SubtitleRequest(BaseModel):
     video_script: str

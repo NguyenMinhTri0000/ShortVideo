@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
-import { cancelledJobs } from './video.processor';
+import { cancelledJobs, killActiveProcess } from './video.processor';
 
 export type VideoJobConfig = {
   voice_name?: string;
@@ -70,10 +70,21 @@ export class QueueService {
 
   async cancelJob(jobId: string) {
     cancelledJobs.add(jobId);
-    const job = await this.videoQueue.getJob(jobId);
-    if (job) {
-      await job.remove();
-      return true;
+    killActiveProcess(jobId);
+
+    try {
+      const job = await this.videoQueue.getJob(jobId);
+      if (job) {
+        const state = await job.getState();
+        if (state === 'active') {
+          await job.discard();
+        } else {
+          await job.remove();
+        }
+        return true;
+      }
+    } catch {
+      // Ignore if BullMQ state mutation fails
     }
     return false;
   }
