@@ -6,7 +6,10 @@ import {
   Patch,
   Param,
   Delete,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ProductsService,
   type CreateProductDto,
@@ -17,6 +20,12 @@ import { type VideoJobConfig } from '../queue/queue.service';
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
+
+  @Post('assets/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAsset(@UploadedFile() file: any) {
+    return this.productsService.uploadAsset(file);
+  }
 
   @Post()
   create(@Body() dto: CreateProductDto) {

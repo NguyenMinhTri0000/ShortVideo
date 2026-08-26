@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { QueueService, type VideoJobConfig } from '../queue/queue.service';
+import { StorageService } from '../storage/storage.service';
 import { Prisma } from '@prisma/client';
 
 export type CreateProductDto = {
@@ -41,7 +42,30 @@ export class ProductsService {
   constructor(
     private prisma: PrismaService,
     private queueService: QueueService,
+    private storageService: StorageService,
   ) {}
+
+  async uploadAsset(file: any): Promise<{ url: string; key: string }> {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('Vui lòng chọn file hợp lệ để tải lên');
+    }
+
+    const timestamp = Date.now();
+    const originalName = file.originalname || 'asset.bin';
+    const cleanFilename = originalName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const key = `product-assets/${timestamp}-${cleanFilename}`;
+    const contentType = file.mimetype || 'application/octet-stream';
+
+    this.logger.log(`[ProductsService] Uploading asset ${key} (${file.size} bytes, ${contentType})`);
+    await this.storageService.uploadBuffer(file.buffer, key, contentType);
+
+    const url = await this.storageService.getDownloadUrl(key, 86400 * 365);
+    return { url, key };
+  }
+
+  async getAssetStream(key: string, range?: string) {
+    return this.storageService.getFileStream(key, range);
+  }
 
   async create(dto: CreateProductDto) {
     return this.prisma.product.create({

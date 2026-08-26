@@ -31,6 +31,14 @@ import {
   Edit3,
   Save,
   RotateCw,
+  Image as ImageIcon,
+  Upload,
+  ArrowUp,
+  ArrowDown,
+  Play,
+  Film,
+  Link2,
+  FileVideo,
 } from "lucide-react";
 
 type ProductContentBrief = {
@@ -179,6 +187,74 @@ export default function ProductsPage() {
   const [generatingScriptIdeaId, setGeneratingScriptIdeaId] = useState<string | null>(null);
   const [activeScriptModal, setActiveScriptModal] = useState<VideoScript | null>(null);
   const [generatingVideoScriptId, setGeneratingVideoScriptId] = useState<string | null>(null);
+  const [previewMediaUrl, setPreviewMediaUrl] = useState<{ url: string; type: "image" | "video" } | null>(null);
+
+  // Visual Assets State & Handlers
+  const [activeAssetSubTab, setActiveAssetSubTab] = useState<"images" | "videos">("images");
+  const [newImageUrlInput, setNewImageUrlInput] = useState("");
+  const [newVideoUrlInput, setNewVideoUrlInput] = useState("");
+  const [isUploadingAsset, setIsUploadingAsset] = useState(false);
+
+  const handleUploadAssetFile = async (e: React.ChangeEvent<HTMLInputElement>, type: "image" | "video") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingAsset(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await api.post("/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const url = res.data.url;
+      if (type === "image") {
+        setEditForm((prev) => ({ ...prev, images: [...(prev.images || []), url] }));
+      } else {
+        setEditForm((prev) => ({ ...prev, videos: [...(prev.videos || []), url] }));
+      }
+    } catch (err) {
+      console.error("Failed to upload asset file:", err);
+    } finally {
+      setIsUploadingAsset(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleAddImageUrl = () => {
+    if (!newImageUrlInput.trim()) return;
+    setEditForm((prev) => ({ ...prev, images: [...(prev.images || []), newImageUrlInput.trim()] }));
+    setNewImageUrlInput("");
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setEditForm((prev) => ({
+      ...prev,
+      images: (prev.images || []).filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleMoveImage = (index: number, direction: "up" | "down") => {
+    if (!editForm.images) return;
+    const newImages = [...editForm.images];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newImages.length) return;
+    const temp = newImages[index];
+    newImages[index] = newImages[targetIndex];
+    newImages[targetIndex] = temp;
+    setEditForm((prev) => ({ ...prev, images: newImages }));
+  };
+
+  const handleAddVideoUrl = () => {
+    if (!newVideoUrlInput.trim()) return;
+    setEditForm((prev) => ({ ...prev, videos: [...(prev.videos || []), newVideoUrlInput.trim()] }));
+    setNewVideoUrlInput("");
+  };
+
+  const handleRemoveVideo = (index: number) => {
+    setEditForm((prev) => ({
+      ...prev,
+      videos: (prev.videos || []).filter((_, i) => i !== index),
+    }));
+  };
 
   const { data: contentIdeas = [], isLoading: isLoadingIdeas, refetch: refetchIdeas } = useQuery<ContentIdea[]>({
     queryKey: ["content-ideas", selectedProduct?.id],
@@ -289,9 +365,12 @@ export default function ProductsPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => api.patch(`/products/${id}`, data),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      setSelectedProduct(null);
+      if (res.data) {
+        setSelectedProduct(res.data);
+      }
+      setModalTab("view");
     },
   });
 
@@ -376,6 +455,8 @@ export default function ProductsPage() {
       benefits: product.benefits || [],
       usp: product.usp || [],
       painPoints: product.painPoints || [],
+      images: product.images || [],
+      videos: product.videos || [],
     });
     setModalTab("view");
   };
@@ -1158,6 +1239,50 @@ export default function ProductsPage() {
                     </div>
                   </div>
 
+                  {/* Product Visual Assets Overview in View Tab */}
+                  {((selectedProduct.images && selectedProduct.images.length > 0) ||
+                    (selectedProduct.videos && selectedProduct.videos.length > 0)) && (
+                    <div className="p-4 rounded-xl bg-violet-950/20 border border-violet-500/30 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-violet-300 flex items-center gap-2 uppercase tracking-wider">
+                          <ImageIcon className="w-4 h-4 text-violet-400" /> Product Visual Assets ({selectedProduct.images?.length || 0} Ảnh, {selectedProduct.videos?.length || 0} Video)
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => setModalTab("edit")}
+                          className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1 font-semibold"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" /> Quản lý Assets
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                        {(selectedProduct.images || []).map((img, i) => (
+                          <div
+                            key={i}
+                            onClick={() => setPreviewMediaUrl({ url: img, type: "image" })}
+                            className="relative group rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800 aspect-square cursor-pointer"
+                          >
+                            <img src={img} alt={`Asset image ${i}`} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Eye className="w-4 h-4 text-white" />
+                            </div>
+                          </div>
+                        ))}
+                        {(selectedProduct.videos || []).map((vid, i) => (
+                          <div
+                            key={i}
+                            onClick={() => setPreviewMediaUrl({ url: vid, type: "video" })}
+                            className="relative group rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800 aspect-square cursor-pointer flex flex-col items-center justify-center bg-black/80"
+                          >
+                            <Film className="w-6 h-6 text-indigo-400" />
+                            <span className="text-[10px] text-zinc-300 font-semibold mt-1">Video #{i + 1}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Re-Research Action */}
                   <div className="p-4 rounded-lg bg-zinc-950/80 border border-zinc-800 flex items-center justify-between">
                     <div>
@@ -1331,76 +1456,305 @@ export default function ProductsPage() {
                 </div>
               ) : (
                 /* Edit Form Tab */
-                <form onSubmit={handleSaveEdit} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <form onSubmit={handleSaveEdit} className="space-y-6">
+                  {/* Metadata Section */}
+                  <div className="space-y-4 p-4 rounded-xl bg-zinc-950/60 border border-zinc-800/80">
+                    <h4 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-violet-400" /> Thông Tin Cơ Bản
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1">Tên Sản Phẩm</label>
+                        <input
+                          type="text"
+                          value={editForm.name || ""}
+                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1">Thương Hiệu (Brand)</label>
+                        <input
+                          type="text"
+                          value={editForm.brand || ""}
+                          onChange={(e) => setEditForm({ ...editForm, brand: e.target.value })}
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1">Danh Mục (Category)</label>
+                        <input
+                          type="text"
+                          value={editForm.category || ""}
+                          onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1">Giá Bán</label>
+                        <input
+                          type="text"
+                          value={editForm.price || ""}
+                          onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
+                        />
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="block text-xs font-medium text-zinc-400 mb-1">
-                        Tên Sản Phẩm
-                      </label>
-                      <input
-                        type="text"
-                        value={editForm.name || ""}
-                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Mô Tả Sản Phẩm</label>
+                      <textarea
+                        rows={3}
+                        value={editForm.description || ""}
+                        onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
                       />
                     </div>
+
                     <div>
-                      <label className="block text-xs font-medium text-zinc-400 mb-1">
-                        Thương Hiệu (Brand)
-                      </label>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Khách Hàng Mục Tiêu</label>
                       <input
                         type="text"
-                        value={editForm.brand || ""}
-                        onChange={(e) => setEditForm({ ...editForm, brand: e.target.value })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-400 mb-1">
-                        Danh Mục (Category)
-                      </label>
-                      <input
-                        type="text"
-                        value={editForm.category || ""}
-                        onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-400 mb-1">
-                        Giá Bán
-                      </label>
-                      <input
-                        type="text"
-                        value={editForm.price || ""}
-                        onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                        value={editForm.targetAudience || ""}
+                        onChange={(e) => setEditForm({ ...editForm, targetAudience: e.target.value })}
                         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1">
-                      Mô Tả Sản Phẩm
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={editForm.description || ""}
-                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
-                    />
-                  </div>
+                  {/* Product Visual Assets Section */}
+                  <div className="space-y-4 p-4 rounded-xl bg-violet-950/10 border border-violet-500/20">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <ImageIcon className="w-4 h-4 text-violet-400" />
+                        <h4 className="text-xs font-bold text-violet-300 uppercase tracking-wider">
+                          Product Visual Assets (Hình ảnh & Video Sản Phẩm)
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[10px] font-semibold">
+                          {(editForm.images?.length || 0) + (editForm.videos?.length || 0)} Assets
+                        </span>
+                      </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1">
-                      Khách Hàng Mục Tiêu
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.targetAudience || ""}
-                      onChange={(e) => setEditForm({ ...editForm, targetAudience: e.target.value })}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
-                    />
+                      {/* Visual Sub-tabs */}
+                      <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-lg border border-zinc-800">
+                        <button
+                          type="button"
+                          onClick={() => setActiveAssetSubTab("images")}
+                          className={`px-3 py-1 text-[11px] font-medium rounded-md flex items-center gap-1.5 transition-all ${
+                            activeAssetSubTab === "images"
+                              ? "bg-violet-600 text-white shadow-sm"
+                              : "text-zinc-400 hover:text-zinc-200"
+                          }`}
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          Hình Ảnh ({editForm.images?.length || 0})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveAssetSubTab("videos")}
+                          className={`px-3 py-1 text-[11px] font-medium rounded-md flex items-center gap-1.5 transition-all ${
+                            activeAssetSubTab === "videos"
+                              ? "bg-violet-600 text-white shadow-sm"
+                              : "text-zinc-400 hover:text-zinc-200"
+                          }`}
+                        >
+                          <Film className="w-3.5 h-3.5" />
+                          Video Clips ({editForm.videos?.length || 0})
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* IMAGES SUB-TAB */}
+                    {activeAssetSubTab === "images" && (
+                      <div className="space-y-4">
+                        {/* Image Upload & URL input bar */}
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <label className="cursor-pointer inline-flex items-center justify-center gap-2 px-3 py-2 bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/40 rounded-lg text-xs font-semibold shrink-0 transition-colors">
+                            {isUploadingAsset ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Upload className="w-3.5 h-3.5" />
+                            )}
+                            Tải Ảnh Từ Máy Tính
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={isUploadingAsset}
+                              onChange={(e) => handleUploadAssetFile(e, "image")}
+                            />
+                          </label>
+                          <div className="flex-1 flex gap-2">
+                            <div className="relative flex-1">
+                              <Link2 className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                              <input
+                                type="text"
+                                placeholder="Dán đường dẫn (URL) hình ảnh sản phẩm..."
+                                value={newImageUrlInput}
+                                onChange={(e) => setNewImageUrlInput(e.target.value)}
+                                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleAddImageUrl}
+                              className="px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium shrink-0"
+                            >
+                              Thêm URL
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Image Thumbnails Grid */}
+                        {editForm.images && editForm.images.length > 0 ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 max-h-64 overflow-y-auto pr-1">
+                            {editForm.images.map((imgUrl, idx) => (
+                              <div
+                                key={idx}
+                                className="group relative rounded-xl overflow-hidden bg-zinc-950 border border-zinc-800 hover:border-violet-500/60 transition-all aspect-square flex flex-col"
+                              >
+                                <img
+                                  src={imgUrl}
+                                  alt={`Product image ${idx + 1}`}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = "none";
+                                  }}
+                                />
+                                <div className="absolute top-1 left-1 bg-black/70 text-white text-[10px] font-bold px-1.5 py-0.5 rounded backdrop-blur-sm">
+                                  #{idx + 1} {idx === 0 ? "Ảnh chính" : ""}
+                                </div>
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 p-1">
+                                  {idx > 0 && (
+                                    <button
+                                      type="button"
+                                      title="Di chuyển lên đầu"
+                                      onClick={() => handleMoveImage(idx, "up")}
+                                      className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200"
+                                    >
+                                      <ArrowUp className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  {idx < editForm.images!.length - 1 && (
+                                    <button
+                                      type="button"
+                                      title="Di chuyển xuống"
+                                      onClick={() => handleMoveImage(idx, "down")}
+                                      className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200"
+                                    >
+                                      <ArrowDown className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    title="Xem kích thước lớn"
+                                    onClick={() => setPreviewMediaUrl({ url: imgUrl, type: "image" })}
+                                    className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title="Xóa ảnh này"
+                                    onClick={() => handleRemoveImage(idx)}
+                                    className="p-1.5 rounded-lg bg-rose-600/80 hover:bg-rose-500 text-white"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-6 rounded-xl border border-dashed border-zinc-800 bg-zinc-950/40 text-center space-y-2">
+                            <ImageIcon className="w-8 h-8 text-zinc-600 mx-auto" />
+                            <p className="text-xs text-zinc-400">
+                              Chưa có hình ảnh sản phẩm nào. Hãy tải lên file ảnh hoặc nhập đường dẫn URL ảnh sản phẩm thực tế.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* VIDEOS SUB-TAB */}
+                    {activeAssetSubTab === "videos" && (
+                      <div className="space-y-4">
+                        {/* Video Upload & URL bar */}
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <label className="cursor-pointer inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 rounded-lg text-xs font-semibold shrink-0 transition-colors">
+                            {isUploadingAsset ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Upload className="w-3.5 h-3.5" />
+                            )}
+                            Tải Video Từ Máy Tính
+                            <input
+                              type="file"
+                              accept="video/*"
+                              className="hidden"
+                              disabled={isUploadingAsset}
+                              onChange={(e) => handleUploadAssetFile(e, "video")}
+                            />
+                          </label>
+                          <div className="flex-1 flex gap-2">
+                            <div className="relative flex-1">
+                              <Link2 className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                              <input
+                                type="text"
+                                placeholder="Dán đường dẫn (URL) video clip sản phẩm (MP4/WebM)..."
+                                value={newVideoUrlInput}
+                                onChange={(e) => setNewVideoUrlInput(e.target.value)}
+                                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleAddVideoUrl}
+                              className="px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium shrink-0"
+                            >
+                              Thêm URL
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Video List / Grid */}
+                        {editForm.videos && editForm.videos.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-64 overflow-y-auto pr-1">
+                            {editForm.videos.map((vidUrl, idx) => (
+                              <div
+                                key={idx}
+                                className="relative rounded-xl overflow-hidden bg-zinc-950 border border-zinc-800 flex flex-col p-2 space-y-2"
+                              >
+                                <video
+                                  src={vidUrl}
+                                  controls
+                                  className="w-full h-28 object-cover rounded-lg bg-black"
+                                />
+                                <div className="flex items-center justify-between pt-1">
+                                  <span className="text-[10px] text-zinc-400 font-mono truncate max-w-[160px]">
+                                    Video #{idx + 1}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveVideo(idx)}
+                                    className="p-1 rounded bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 text-xs flex items-center gap-1"
+                                  >
+                                    <Trash2 className="w-3 h-3" /> Xóa
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-6 rounded-xl border border-dashed border-zinc-800 bg-zinc-950/40 text-center space-y-2">
+                            <FileVideo className="w-8 h-8 text-zinc-600 mx-auto" />
+                            <p className="text-xs text-zinc-400">
+                              Chưa có video clip sản phẩm nào. Hãy tải lên file MP4 hoặc nhập URL video thực tế để làm visual chính cho AI Video.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
@@ -1540,6 +1894,34 @@ export default function ProductsPage() {
                 Tạo Video Từ Kịch Bản 2.0
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Preview Modal for Images / Videos */}
+      {previewMediaUrl && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center justify-center">
+            <button
+              onClick={() => setPreviewMediaUrl(null)}
+              className="absolute -top-10 right-0 p-2 text-zinc-400 hover:text-white bg-zinc-900/80 rounded-full"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            {previewMediaUrl.type === "image" ? (
+              <img
+                src={previewMediaUrl.url}
+                alt="Preview"
+                className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl border border-zinc-800"
+              />
+            ) : (
+              <video
+                src={previewMediaUrl.url}
+                controls
+                autoPlay
+                className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl border border-zinc-800 bg-black"
+              />
+            )}
           </div>
         </div>
       )}

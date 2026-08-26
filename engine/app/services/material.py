@@ -680,8 +680,84 @@ def process_product_images(
     return product_clips
 
 
+def process_product_videos(
+    task_id: str,
+    videos: List[str],
+    video_aspect: VideoAspect = VideoAspect.portrait,
+    target_p0_duration: float = 0.0,
+    clip_duration: float = 3.0,
+) -> List[str]:
+    """
+    Download or copy product video clips (P0 Product Visuals).
+    """
+    if not videos:
+        return []
+
+    task_dir = utils.task_dir(task_id)
+    valid_video_clips = []
+
+    for idx, vid_src in enumerate(videos):
+        if not vid_src or not isinstance(vid_src, str):
+            continue
+
+        local_vid_path = os.path.join(task_dir, f"prod_vid_{idx}.mp4")
+
+        if vid_src.startswith(("http://", "https://")):
+            try:
+                r = requests.get(vid_src, timeout=30, verify=_get_tls_verify(), stream=True)
+                if r.status_code == 200:
+                    with open(local_vid_path, "wb") as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    valid_video_clips.append(local_vid_path)
+                else:
+                    logger.warning(f"failed download product video HTTP {r.status_code}: {vid_src}")
+            except Exception as e:
+                logger.warning(f"failed to download product video {vid_src}: {e}")
+        elif os.path.isfile(vid_src):
+            try:
+                shutil.copy(vid_src, local_vid_path)
+                valid_video_clips.append(local_vid_path)
+            except Exception as e:
+                logger.warning(f"failed to copy product video file {vid_src}: {e}")
+
+    logger.info(
+        f"processed {len(valid_video_clips)} product video clips for task {task_id}"
+    )
+    return valid_video_clips
+
+
+def process_product_visuals(
+    task_id: str,
+    images: List[str],
+    videos: List[str] = None,
+    video_aspect: VideoAspect = VideoAspect.portrait,
+    target_p0_duration: float = 0.0,
+    clip_duration: float = 3.0,
+) -> List[str]:
+    """
+    Combines product video clips and product image motion clips into P0 Product Visuals.
+    """
+    video_clips = process_product_videos(
+        task_id=task_id,
+        videos=videos or [],
+        video_aspect=video_aspect,
+        target_p0_duration=target_p0_duration,
+        clip_duration=clip_duration,
+    )
+    image_clips = process_product_images(
+        task_id=task_id,
+        images=images or [],
+        video_aspect=video_aspect,
+        target_p0_duration=target_p0_duration,
+        clip_duration=clip_duration,
+    )
+    return video_clips + image_clips
+
+
 if __name__ == "__main__":
     download_videos(
         "test123", ["Money Exchange Medium"], audio_duration=100, source="pixabay"
     )
+
 

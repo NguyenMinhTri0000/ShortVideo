@@ -93,6 +93,7 @@ export class VideoProcessor extends WorkerHost {
           benefits: product.benefits || [],
           targetAudience: product.targetAudience || '',
           images: product.images || [],
+          videos: product.videos || [],
         });
       }
     }

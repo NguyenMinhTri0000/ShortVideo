@@ -1,414 +1,409 @@
-# Báo Cáo Phân Tích Codebase Repository: Short-Video (MoneyPrinterTurbo) & Hướng Dẫn Phát Triển Hệ Thống Affiliate Video Automation
+# Báo Cáo Phân Tích Codebase Repository: Short-Video (MoneyPrinterTurbo & Affiliate Automation Suite)
 
-> **Ngày lập tài liệu:** 25/08/2026  
-> **Phiên bản codebase:** MoneyPrinterTurbo v1.3.0 (Tích hợp Next.js Frontend + NestJS Backend + Python Engine)  
+> **Ngày lập tài liệu:** 26/08/2026  
+> **Phiên bản codebase:** Short-Video Enterprise Suite v2.0 (Next.js 15 Frontend + NestJS 10 Backend + Python Video Engine + Multi-Platform Publishing & Analytics)  
 > **Người thực hiện:** Senior Software Architect & Codebase Analyst  
-> **Ngôn ngữ:** Tiếng Việt (Tên Class, Function, File, Command giữ nguyên tiếng Anh để truy vết code)
+> **Ngôn ngữ:** Tiếng Việt (Tên Class, Function, File, API Endpoint, CLI Flag giữ nguyên tiếng Anh để truy vết code)
 
 ---
 
 ## MỤC LỤC
-1. [Phần A — Tổng Quan Repository](#phần-a--tổng-quan-repository)
-2. [Phần B — Giải Thích Cấu Trúc Folder & Các File Quan Trọng](#phần-b--giải-thích-cấu-trúc-folder--các-file-quan-trọng)
-3. [Phần C — Trace Toàn Bộ Flow Tạo Một Video (End-to-End Flow)](#phần-c--trace-toàn-bộ-flow-tạo-một-video-end-to-end-flow)
-4. [Phần D — AI Provider Architecture (LLM)](#phần-d--ai-provider-architecture-llm)
-5. [Phần E — TTS Pipeline (Text-to-Speech)](#phần-e--tts-pipeline-text-to-speech)
-6. [Phần F — Image / Video / Stock Media Pipeline](#phần-f--image--video--stock-media-pipeline)
-7. [Phần G — Subtitle Engine](#phần-g--subtitle-engine)
-8. [Phần H — Video Rendering Engine](#phần-h--video-rendering-engine)
-9. [Phần I — Database Và Storage Architecture](#phần-i--database-và-storage-architecture)
-10. [Phần J — Configuration & Environment Variables](#phần-j--configuration--environment-variables)
-11. [Phần K — Hướng Dẫn Chạy Repository Trên Linux Mint](#phần-k--hướng-dẫn-chạy-repository-trên-linux-mint)
-12. [Phần L — Ma Trận Tính Năng Hiện Tại (Feature Matrix)](#phần-l--ma-trận-tính-năng-hiện-tại-feature-matrix)
-13. [Phần M — Phân Tích Khoảng Cách (Gap Analysis): Hệ Thống Affiliate Còn Thiếu Gì?](#phần-m--phân-tích-khoảng-cách-gap-analysis-hệ-thống-affiliate-còn-thiếu-gì)
-14. [Phần N — Kiến Trúc Hệ Thống Mục Tiêu (Affiliate Video Automation)](#phần-n--kiến-trúc-hệ-thống-mục-tiêu-affiliate-video-automation)
-15. [Phần O — Tôi Cần Sửa Code Ở Đâu? (Exact Code Modification Mapping)](#phần-o--tôi-cần-sửa-code-ở-đâu-exact-code-modification-mapping)
-16. [Phần P — Những Phần TUYỆT ĐỐI KHÔNG Nên Sửa](#phần-p--những-phần-tuyệt-đối-không-nên-sửa)
-17. [Phần Q — Đề Xuất Roadmap Implementation (Phase 0 đến Phase 10)](#phần-q--đề-xuất-roadmap-implementation-phase-0-đến-phase-10)
-18. [Phần R — Giải Thích Cho Người Không Biết Codebase / Không Rành Python](#phần-r--giải-thích-cho-người-không-biết-codebase--không-rành-python)
-19. [Phần S — Các Sơ Đồ Kiến Trúc & Luồng Dữ Liệu (Diagrams)](#phần-s--các-sơ-đồ-kiến-trúc--luồng-dữ-liệu-diagrams)
-20. [Phần T — Trả Lời Trực Tiếp 10 Câu Hỏi Cốt Lõi](#phần-t--trả-lời-trực-tiếp-10-câu-hỏi-cốt-lõi)
-21. [Danh Sách Vấn Đề Kỹ Thuật (Known Issues / Technical Debt)](#danh-sách-vấn-đề-kỹ-thuật-known-issues--technical-debt)
+1. [Phần A — Tổng Quan Repository & Kiến Trúc Doanh Nghiệp](#phần-a--tổng-quan-repository--kiến-trúc-doanh-nghiệp)
+2. [Phần B — Giải Thích Cấu Trúc Folder & Chi Tiết Các Thành Phần Quan Trọng](#phần-b--giải-thích-cấu-trúc-folder--chi-tiết-các-thành-phần-quan-trọng)
+3. [Phần C — Phân Tích Toàn Bộ 15 Module Backend (NestJS API & Services)](#phần-c--phân-tích-toàn-bộ-15-module-backend-nestjs-api--services)
+4. [Phần D — Phân Tích Chi Tiết Python Core Video Engine](#phần-d--phân-tích-chi-tiết-python-core-video-engine)
+5. [Phần E — Database Schema & Data Models (PostgreSQL + Prisma ORM)](#phần-e--database-schema--data-models-postgresql--prisma-orm)
+6. [Phần F — Queue System, Task Worker & Cơ Chế Phục Hồi Lỗi (Error Recovery)](#phần-f--queue-system-task-worker--cơ-chế-phục-hồi-lỗi-error-recovery)
+7. [Phần G — Trace Các Luồng Xử Lý End-to-End (End-to-End Workflows)](#phần-g--trace-các-luồng-xử-lý-end-to-end-end-to-end-workflows)
+8. [Phần H — AI Provider & LLM Architecture](#phần-h--ai-provider--llm-architecture)
+9. [Phần I — TTS Pipeline (Text-to-Speech)](#phần-i--tts-pipeline-text-to-speech)
+10. [Phần J — Image / Video / Product Visual & Stock Media Pipeline](#phần-j--image--video--product-visual--stock-media-pipeline)
+11. [Phần K — Subtitle Engine & Video Rendering Engine](#phần-k--subtitle-engine--video-rendering-engine)
+12. [Phần L — Multi-Platform Publishing & Analytics Engine](#phần-l--multi-platform-publishing--analytics-engine)
+13. [Phần M — Configuration, Environment Variables & Docker Architecture](#phần-m--configuration-environment-variables--docker-architecture)
+14. [Phần N — Hướng Dẫn Chạy & Vận Hành Hệ Thống Trên Linux Mint](#phần-n--hướng-dẫn-chạy--vận-hành-hệ-thống-trên-linux-mint)
+15. [Phần O — Ma Trận Tính Năng Thực Tế Trong Codebase (Feature Matrix)](#phần-o--ma-trận-tính-năng-thực-tế-trong-codebase-feature-matrix)
+16. [Phần P — Các Sơ Đồ Kiến Trúc & Luồng Dữ Liệu (Diagrams)](#phần-p--các-sơ-đồ-kiến-trúc--luồng-dữ-liệu-diagrams)
+17. [Phần Q — Trả Lời Trực Tiếp Các Câu Hỏi Cốt Lõi Về Codebase](#phần-q--trả-lời-trực-tiếp-các-câu-hỏi-cốt-lõi-về-codebase)
+18. [Danh Sách Vấn Đề Kỹ Thuật & Cấu Hình Lưu Ý (Known Issues / Operational Notes)](#danh-sách-vấn-đề-kỹ-thuật--cấu-hình-lưu-ý-known-issues--operational-notes)
 
 ---
 
-## Phần A — Tổng Quan Repository
+## Phần A — Tổng Quan Repository & Kiến Trúc Doanh Nghiệp
 
 ### 1. Repository này dùng để làm gì?
-Repository này (gốc là dự án **MoneyPrinterTurbo**) là một hệ thống tự động hóa tạo short video (video ngắn 9:16 hoặc 16:9) từ một chủ đề (topic) hoặc kịch bản (script) cho trước. Hệ thống tự động điều phối chuỗi công việc:
-1. Gọi LLM sinh kịch bản văn bản (Script) và các từ khóa tìm kiếm hình ảnh/video (Search Terms).
-2. Gọi TTS (Text-to-Speech) để tạo file âm thanh đọc kịch bản.
-3. Sinh file phụ đề SRT (từ thời gian biểu của TTS hoặc phân tích âm thanh qua Whisper).
-4. Tìm kiếm và tải video stock bản quyền miễn phí từ Pexels, Pixabay, Coverr (hoặc lấy từ folder local).
-5. Ghép nối video clip, đè nhạc nền (BGM), ghi phụ đề, và xuất file `.mp4` hoàn chỉnh.
-
-### 2. Sự khác biệt giữa README và Kiến Trúc Thực Tế Trong Codebase
-* **README**: Tập trung giải thích việc chạy dự án Python thuần thông qua Streamlit WebUI (`webui/Main.py`) hoặc FastAPI (`main.py`) hoặc CLI (`cli.py`).
-* **Codebase Thực Tế**: Dự án đã được nâng cấp thành **Kiến trúc Doanh nghiệp Full-stack 3 Lớp (Three-tier Enterprise Architecture)** gồm:
-  - **Lớp 1 (Frontend)**: Next.js + React + Tailwind CSS (nằm ở thư mục `frontend/`).
-  - **Lớp 2 (Backend Core & Queue)**: NestJS API Gateway + PostgreSQL + Prisma ORM + BullMQ / Redis Task Queue (nằm ở thư mục `backend/`).
-  - **Lớp 3 (Video Engine)**: Python Engine với MoviePy, FFmpeg, Edge-TTS, Pexels API, LLM SDKs (nằm ở thư mục `engine/`).
-
-### 3. Technology Stack Tổng Thể
-| Thành phần | Công nghệ sử dụng | Location |
-| :--- | :--- | :--- |
-| **Frontend** | Next.js 15, React 19, Tailwind CSS, TanStack Query | `frontend/` |
-| **Backend API** | NestJS (TypeScript), Prisma ORM | `backend/src/` |
-| **Database** | PostgreSQL 15 | Managed via Prisma (`backend/prisma/schema.prisma`) |
-| **Queue / Worker** | BullMQ + Redis 7 | `backend/src/modules/queue/` |
-| **Object Storage** | MinIO (S3 compatible) | `backend/src/modules/storage/` |
-| **Video Engine** | Python 3.11, MoviePy 2.x, FFmpeg, Pillow, NumPy | `engine/app/services/video.py` |
-| **LLM Provider** | Cloud API: Google Gemini, OpenAI, DeepSeek, Qwen, AIHubMix,... | `engine/app/services/llm.py` |
-| **TTS Provider** | Edge TTS (Azure V1 free), Azure V2, SiliconFlow, Gemini, ElevenLabs | `engine/app/services/voice.py` |
-| **Stock Media** | Pexels API, Pixabay API, Coverr API, Local files | `engine/app/services/material.py` |
-| **Docker** | Docker Compose (`backend`, `frontend`, `postgres`, `redis`, `minio`) | `docker-compose.yml` |
+Repository này là một hệ thống tự động hóa sáng tạo short video (khổ 9:16 hoặc 16:9) và quản lý chiến dịch **Affiliate Video Marketing đa nền tảng (Multi-Platform Affiliate Video Automation)**. Hệ thống có khả năng:
+1. **Nghiên cứu sản phẩm tự động (Product Research)**: Trích xuất thông tin sản phẩm từ link Shopee, Lazada, TikTok Shop, Amazon hoặc website bất kỳ, sau đó dùng AI phân tích USP, tính năng, đối tượng mục tiêu, rào cản mua hàng (pain points) và góc nhìn truyền thông (marketing angles).
+2. **Lên chiến lược nội dung (Content Strategy)**: Tự động đề xuất các ý tưởng video (review sản phẩm, giải quyết vấn đề, so sánh, mẹo sử dụng, bóc phốt/myth busting, storytelling...) tối ưu cho từng sản phẩm.
+3. **Sinh kịch bản chi tiết (Script Engine)**: Tạo kịch bản phân cảnh (multi-scene script) gồm Hook 0-3s, vấn đề, giải pháp sản phẩm, lợi ích cốt lõi và Call-To-Action (CTA) dẫn link Affiliate.
+4. **Tạo Video tự động (Core Video Engine)**: 
+   - Gọi LLM sinh text kịch bản & từ khóa tìm B-roll.
+   - Gọi Cloud TTS (Edge-TTS miễn phí hoặc Azure/Gemini/ElevenLabs) sinh giọng đọc tiếng Việt chuẩn.
+   - Tạo file phụ đề SRT khớp timestamp chính xác.
+   - Thu thập video stock (Pexels, Pixabay, Coverr) hoặc xử lý ảnh/clip sản phẩm thực tế (Product Visuals).
+   - Trộn âm thanh, đè phụ đề chữ, nhạc nền (BGM) và xuất file `.mp4` hoàn chỉnh bằng MoviePy & FFmpeg.
+5. **Đăng video đa nền tảng (Multi-Platform Publishing)**: Quản lý tài khoản mạng xã hội (TikTok, YouTube, Instagram, Facebook), lên lịch đăng (schedule) và tự động đăng video qua API.
+6. **Thu thập & Phân tích chỉ số (Analytics)**: Tự động đo lường lượt xem (views), thích (likes), bình luận (comments), chia sẻ (shares), lưu (saves), click link affiliate và tỷ lệ tương tác (engagement rate) theo thời gian thực.
 
 ---
 
-## Phần B — Giải Thích Cấu Trúc Folder & Các File Quan Trọng
+### 2. Kiến Trúc 3 Lớp Doanh Nghiệp (Three-tier Enterprise Architecture)
+Repository được tổ chức theo kiến trúc 3 lớp rõ ràng:
+* **Lớp 1 — Frontend (Web User Interface)**: Viết bằng **Next.js 15 + React 19 + Tailwind CSS + TanStack Query**, nằm ở thư mục `frontend/`. Cung cấp giao diện quản trị Dashboard, Quản lý Sản phẩm Affiliate, Tạo Ý tưởng & Kịch bản, Theo dõi Tiến trình Render real-time, Quản lý Đăng bài đa nền tảng và Báo cáo Phân tích Analytics.
+* **Lớp 2 — Backend Core & Task Queue**: Viết bằng **NestJS (TypeScript) + Prisma ORM + PostgreSQL 15 + BullMQ / Redis 7 + MinIO S3 Storage**, nằm ở thư mục `backend/`. Đảm nhận vai trò API Gateway, xác thực, quản lý database, cào dữ liệu sản phẩm, phân tích AI, lập lịch queue, điều phối Python worker và lưu trữ media.
+* **Lớp 3 — Video Generation Engine**: Viết bằng **Python 3.11 + MoviePy 2.x + FFmpeg + Edge-TTS + Google Gemini / OpenAI SDKs**, nằm ở thư mục `engine/`. Đảm nhận nhiệm vụ nặng nhất là xử lý đồ họa, ghép nối clip, tổng hợp âm thanh và render video MP4. Engine hỗ trợ cả giao diện dòng lệnh CLI (`cli.py`) lẫn REST API Server (`main.py`).
 
-### 1. Cấu trúc tổng thể repository
+---
+
+### 3. Technology Stack Chi Tiết
+| Thành phần | Công nghệ sử dụng | Đường dẫn source code |
+| :--- | :--- | :--- |
+| **Frontend UI** | Next.js 15 (App Router), React 19, Tailwind CSS, Lucide React, TanStack Query | `frontend/src/` |
+| **Backend API Gateway** | NestJS 10, TypeScript, Validation Pipes, Swagger UI | `backend/src/` |
+| **Database & ORM** | PostgreSQL 15, Prisma ORM (11 models) | `backend/prisma/schema.prisma` |
+| **Queue / Task Processing**| BullMQ, Redis 7 (3 Queues: `video-generation`, `product-research`, `publish-job`) | `backend/src/modules/queue/` |
+| **Object Storage** | MinIO S3 Compatible Storage | `backend/src/modules/storage/` |
+| **Product Scraper / Adapters**| Shopee, Lazada, TikTok Shop, Amazon, Generic HTML Parser | `backend/src/modules/product-research/adapters/` |
+| **Python Video Engine** | Python 3.11, MoviePy 2.x, FFmpeg, Pillow (PIL), NumPy | `engine/app/services/video.py` |
+| **LLM Providers** | Cloud API: Google Gemini (`gemini-2.5-flash`), OpenAI, DeepSeek, Qwen, Ollama, AIHubMix | `engine/app/services/llm.py` & `backend/src/modules/llm/` |
+| **TTS Providers** | Edge-TTS (Azure V1 free), Azure V2, SiliconFlow, Gemini, ElevenLabs, OpenAI TTS | `engine/app/services/voice.py` |
+| **Stock & Material Media** | Pexels API, Pixabay API, Coverr API, Product Image Processor, Local files | `engine/app/services/material.py` |
+| **Multi-Platform Publishing** | TikTok API, YouTube Data API v3, Instagram Graph API, Facebook Graph API | `backend/src/modules/publishing/adapters/` |
+| **Containerization** | Docker, Docker Compose (`postgres`, `redis`, `minio`, `backend`, `frontend`) | `docker-compose.yml`, `Dockerfile` |
+
+---
+
+## Phần B — Giải Thích Cấu Trúc Folder & Chi Tiết Các Thành Phần Quan Trọng
+
+### 1. Cấu trúc cây thư mục toàn bộ Repository
 ```text
 short-video/
-├── backend/                  # NestJS backend service
+├── backend/                      # NestJS Backend API Service (Port 23001)
 │   ├── prisma/
-│   │   └── schema.prisma     # Định nghĩa Database Schema (PostgreSQL)
+│   │   └── schema.prisma         # Định nghĩa 11 Database Schema Models (PostgreSQL)
 │   ├── src/
-│   │   ├── main.ts           # Entry point của NestJS API Server (Port 23001)
-│   │   ├── app.module.ts     # Root module của backend
-│   │   └── modules/
-│   │       ├── database/     # Prisma database client wrapper
-│   │       ├── ideas/        # Quản lý Ý tưởng (Ideas API) & Auto-script
-│   │       ├── jobs/         # Quản lý Tiến trình tạo Video (Jobs API)
-│   │       ├── llm/          # API wrapper cho LLM (Backend layer)
-│   │       ├── queue/        # BullMQ Worker điều phối Python CLI (`video.processor.ts`)
-│   │       ├── settings/     # Lưu trữ cấu hình hệ thống
-│   │       ├── storage/      # MinIO S3 Object Storage Client
-│   │       └── videos/       # Quản lý kết quả Video hoàn chỉnh
-├── engine/                   # Python Core Video Engine (MoneyPrinterTurbo Core)
-│   ├── main.py               # FastAPI Server (Port 8080)
-│   ├── cli.py                # Command Line Interface chính được backend kích hoạt
-│   ├── config.example.toml   # Mẫu file cấu hình API Key & Tham số
-│   ├── config.toml           # File cấu hình thực tế khi chạy local
+│   │   ├── main.ts               # Entry point NestJS (Auto db push, stuck job recovery, CORS)
+│   │   ├── app.module.ts         # Root module đăng ký 15 feature modules
+│   │   └── modules/              # 15 Modules nghiệp vụ chính:
+│   │       ├── analytics/        # Module thu thập & báo cáo chỉ số Video/Post
+│   │       ├── content-strategy/ # Module tạo ý tưởng nội dung theo chiến lược
+│   │       ├── database/         # Prisma Database Client Wrapper Service
+│   │       ├── ideas/            # Quản lý Ý tưởng (Ideas API) & Auto-script
+│   │       ├── jobs/             # Quản lý Tiến trình Render Video (Jobs API)
+│   │       ├── llm/              # Backend LLM Service Provider Wrapper
+│   │       ├── product-research/ # Module cào dữ liệu sản phẩm (Shopee/Lazada/TikTok/Amazon) & AI Analysis
+│   │       ├── product-visuals/  # Module xử lý hình ảnh sản phẩm 9:16
+│   │       ├── products/         # Quản lý Sản phẩm Affiliate (Products API)
+│   │       ├── publishing/       # Module kết nối tài khoản & đăng bài đa nền tảng
+│   │       ├── queue/            # BullMQ Worker điều phối Python CLI (`video.processor.ts`)
+│   │       ├── script-engine/    # Module sinh kịch bản phân cảnh đa định dạng (VideoScript)
+│   │       ├── settings/         # Quản lý cấu hình hệ thống (System Settings)
+│   │       ├── storage/          # MinIO S3 Object Storage Client Service
+│   │       └── videos/           # Quản lý kết quả Video hoàn chỉnh & Metadata
+├── engine/                       # Python Core Video Engine (MoneyPrinterTurbo Core)
+│   ├── main.py                   # FastAPI REST API Server Entry Point (Port 8080)
+│   ├── cli.py                    # Command Line Interface chính (được BullMQ Worker gọi)
+│   ├── config.example.toml       # Template cấu hình API Keys & tham số mặc định
+│   ├── config.toml               # File cấu hình thực tế khi chạy môi trường
 │   ├── app/
-│   │   ├── config/config.py  # Loader đọc `config.toml` và env
-│   │   ├── controllers/      # REST API Controllers (FastAPI)
-│   │   ├── models/           # Data Schemas (Pydantic / Dataclasses)
-│   │   ├── services/
-│   │   │   ├── task.py       # Orchestrator chính của pipeline video Python
-│   │   │   ├── llm.py        # Module tích hợp Gemini / OpenAI / DeepSeek...
-│   │   │   ├── voice.py      # Module xử lý TTS (Edge-TTS, Azure, Gemini,...)
-│   │   │   ├── material.py   # Module tìm kiếm & download video stock (Pexels, Pixabay)
-│   │   │   ├── subtitle.py   # Module tạo & chỉnh sửa phụ đề SRT
-│   │   │   ├── video.py      # Core ghép nối video, render FFmpeg & MoviePy
-│   │   │   └── twelvelabs.py # Tích hợp AI TwelveLabs (Rerank B-roll)
-│   │   └── utils/            # Helper bảo mật file & mã hóa
+│   │   ├── config/config.py      # Module load `config.toml` và môi trường env
+│   │   ├── controllers/          # FastAPI REST Controllers
+│   │   ├── models/schema.py      # Dataclasses & Pydantic Schemas (`VideoParams`, `MaterialInfo`)
+│   │   ├── services/             # Core Services:
+│   │   │   ├── task.py           # Orchestrator chính của pipeline video Python (6 bước)
+│   │   │   ├── llm.py            # Module gọi Gemini / OpenAI / DeepSeek...
+│   │   │   ├── voice.py          # Module xử lý TTS (Edge-TTS, Azure, Gemini,...)
+│   │   │   ├── material.py       # Module tìm stock (Pexels/Pixabay) & xử lý ảnh sản phẩm
+│   │   │   ├── subtitle.py       # Module sinh file phụ đề `.srt`
+│   │   │   ├── video.py          # Core ghép clip, render MoviePy & FFmpeg
+│   │   │   └── twelvelabs.py     # Module AI TwelveLabs (Rerank B-roll)
+│   │   └── utils/                # Helper mã hóa, uuid, file protection
 │   └── webui/
-│       └── Main.py           # Giao diện Streamlit cũ (chạy độc lập nếu không dùng NestJS)
-├── frontend/                 # Next.js Web App (Dashboard UI)
+│       └── Main.py               # Giao diện Streamlit cũ (chạy độc lập)
+├── frontend/                     # Next.js Web Dashboard Application (Port 23000)
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── page.tsx      # Redirect sang `/dashboard`
-│   │   │   ├── dashboard/    # Trang Tổng quan hệ thống
-│   │   │   ├── ideas/        # Trang Tạo & Quản lý ý tưởng
-│   │   │   ├── jobs/         # Trang Theo dõi tiến trình render real-time
-│   │   │   ├── videos/       # Trang Xem lại danh sách Video đã export
-│   │   │   └── settings/     # Trang Cấu hình API Keys & TTS
-│   │   ├── components/       # UI Components (JobsView, Sidebar, Toast,...)
-│   │   └── lib/              # Client API call (`api.ts`, `backend-media.ts`)
-├── docker-compose.yml        # Docker Compose khởi chạy full-stack (Postgres, Redis, MinIO, Backend, Frontend)
-└── docs/                     # Thư mục tài liệu
+│   │   │   ├── page.tsx          # Redirect tự động sang `/dashboard`
+│   │   │   ├── dashboard/        # Màn hình Tổng quan hệ thống
+│   │   │   ├── products/         # Màn hình Quản lý Sản phẩm Affiliate & Cào dữ liệu
+│   │   │   ├── ideas/            # Màn hình Quản lý Ý tưởng
+│   │   │   ├── publishing/       # Màn hình Quản lý Đăng bài đa nền tảng (PublishingDashboard)
+│   │   │   ├── analytics/        # Màn hình Báo cáo Chỉ số Tương tác (AnalyticsDashboard)
+│   │   │   ├── jobs/             # Màn hình Theo dõi Tiến trình Render real-time & Log
+│   │   │   ├── videos/           # Màn hình Danh sách Video đã export & Preview
+│   │   │   └── settings/         # Màn hình Cấu hình API Keys & Hệ thống
+│   │   ├── components/           # UI Components (`Sidebar`, `JobsView`, `PublishingDashboard`, `AnalyticsDashboard`, `Toast`)
+│   │   └── lib/                  # API Clients (`api.ts`, `backend-media.ts`)
+├── docker-compose.yml            # Docker Compose full-stack (Postgres, Redis, MinIO, Backend, Frontend)
+├── docker-compose.release.yml    # Docker Compose bản Release
+├── docker-compose.gpu.yml        # Docker Compose cấu hình tăng tốc GPU
+├── Dockerfile                    # Dockerfile build Python Core Engine / Standalone Streamlit
+├── Dockerfile.gpu                # Dockerfile cho môi trường CUDA GPU
+└── docs/
+    └── REPOSITORY_ANALYSIS_VI.md # Tài liệu Phân tích Kiến trúc Hệ thống (File hiện tại)
 ```
 
 ---
 
-### 2. Phân tích chi tiết các file quan trọng
+## Phần C — Phân Tích Toàn Bộ 15 Module Backend (NestJS API & Services)
 
-#### File 1: `backend/src/modules/queue/video.processor.ts`
-* **Vai trò:** Lớp Worker lắng nghe queue `video-generation` từ BullMQ.
-* **Class:** `VideoProcessor` (kế thừa `WorkerHost`).
-* **Function quan trọng:** `process(job: Job<VideoJobPayload>): Promise<unknown>`
-* **Cơ chế hoạt động:**
-  - Nhận job request từ NestJS API.
-  - Cập nhật trạng thái job trong PostgreSQL (`GenerationJob` -> `running`).
-  - Dùng Child Process (`spawn`) chạy lệnh:  
-    `uv run --project engine python engine/cli.py --video-subject <subject> --task-id <jobId> ...`
-  - Đọc `stdout` / `stderr` theo thời gian thực để phân tích tiến độ (ví dụ: thấy `## generating audio` -> cập nhật `progress = 35%`).
-  - Ghi log từng dòng vào bảng `JobLog`.
-  - Khi Python CLI hoàn thành (exit code 0), dùng `fluent-ffmpeg` chụp ảnh thumbnail từ `final-1.mp4`.
-  - Upload `final-1.mp4`, `thumbnail.jpg`, `subtitle.srt`, `script.json` lên MinIO bucket.
-  - Tạo record trong bảng `Video` và cập nhật `GenerationJob` -> `completed`.
-  - Dọn dẹp thư mục tạm `engine/storage/tasks/{jobId}`.
-* **Được gọi bởi:** BullMQ Worker Scheduler.
-* **Gọi tới:** Lệnh CLI hệ thống (`uv run`), `PrismaService`, `StorageService`.
+Backend NestJS đóng vai trò trung tâm điều phối của toàn bộ hệ thống. Dưới đây là chi tiết từng module:
 
-#### File 2: `engine/cli.py`
-* **Vai trò:** Entry point của dòng lệnh Python Engine.
-* **Function quan trọng:**
-  - `parse_args()`: Parse tham số truyền từ backend (subject, script, voice_name, aspect_ratio,...).
-  - `build_video_params(args)`: Chuyển đổi args thành đối tượng `VideoParams`.
-  - `run_cli()`: Khởi tạo `task_id` và gọi `tm.start(task_id, params, stop_at)`.
-* **Được gọi bởi:** `backend/src/modules/queue/video.processor.ts`.
-* **Gọi tới:** `engine/app/services/task.py`.
+### 1. `DatabaseModule` (`backend/src/modules/database/`)
+* **Vai trò:** Wrapper đóng gói Prisma Client (`PrismaService`).
+* **Tính năng:** Quản lý kết nối PostgreSQL, lifecycle hooks (`onModuleInit`, `onModuleDestroy`), hỗ trợ transaction và query helper.
 
-#### File 3: `engine/app/services/task.py`
-* **Vai trò:** "Bộ não" điều phối (Orchestrator) toàn bộ luồng tạo video của Python Engine.
-* **Function quan trọng:**
-  - `generate_script()`: Gọi LLM lấy kịch bản nếu user chưa nhập.
-  - `generate_terms()`: Gọi LLM bóc tách từ khóa tìm kiếm B-roll từ kịch bản.
-  - `generate_audio()`: Gọi TTS sinh âm thanh đọc kịch bản.
-  - `generate_subtitle()`: Sinh file phụ đề `.srt` từ TTS alignment hoặc Whisper.
-  - `get_video_materials()`: Tải video stock từ Pexels/Pixabay/Coverr hoặc kiểm tra file local.
-  - `generate_final_videos()`: Gọi `video.combine_videos()` và `video.generate_video()` để render MP4.
-  - `start()`: Hàm tổng sắp thứ tự từng bước 1 -> 6 và hỗ trợ cờ `stop_at`.
-* **Được gọi bởi:** `engine/cli.py` hoặc FastAPI controller `engine/app/controllers/v1/video.py`.
-* **Gọi tới:** `llm.py`, `voice.py`, `material.py`, `subtitle.py`, `video.py`.
+### 2. `StorageModule` (`backend/src/modules/storage/`)
+* **Vai trò:** Quản lý Object Storage MinIO (S3 Compatible).
+* **Service:** `StorageService`.
+* **Tính năng:** Tự động tạo bucket (`videos`), upload file (`putObject`), lấy presigned URL (`getPresignedUrl`), kiểm tra file tồn tại và xóa file.
 
-#### File 4: `engine/app/services/llm.py`
-* **Vai trò:** Abstraction Layer cho tất cả dịch vụ AI LLM (Gemini, OpenAI, DeepSeek, Qwen,...).
-* **Function quan trọng:**
-  - `_generate_response(prompt: str) -> str`: Kiểm tra `config.app.get("llm_provider")` và gọi SDK tương ứng.
-  - `generate_script(...)`: Xây dựng Prompt sinh kịch bản dựa trên chủ đề, ngôn ngữ, số đoạn.
-  - `generate_terms(...)`: Xây dựng Prompt yêu cầu LLM trích xuất 5–8 từ khóa tiếng Anh phục vụ tìm B-roll trên Pexels.
+### 3. `LlmModule` (`backend/src/modules/llm/`)
+* **Vai trò:** Backend LLM Proxy Service.
+* **Service:** `LlmService`.
+* **Tính năng:** Cung cấp API sinh text từ LLM cho các module backend khác, kết nối với Gemini hoặc OpenAI.
+
+### 4. `IdeasModule` (`backend/src/modules/ideas/`)
+* **Controller:** `IdeasController` (`@Controller('ideas')`).
+* **Endpoints:**
+  - `POST /api/ideas`: Tạo ý tưởng mới.
+  - `POST /api/ideas/brainstorm`: AI gợi ý ý tưởng theo từ khóa/chủ đề.
+  - `POST /api/ideas/batch-generate-video`: Sinh hàng loạt video từ danh sách ý tưởng.
+  - `GET /api/ideas`: Lấy danh sách ý tưởng.
+  - `GET /api/ideas/:id`: Lấy chi tiết ý tưởng.
+  - `PATCH /api/ideas/:id`: Cập nhật ý tưởng.
+  - `DELETE /api/ideas/:id`: Xóa ý tưởng.
+  - `POST /api/ideas/:id/generate-script`: Tạo kịch bản cho ý tưởng.
+  - `POST /api/ideas/:id/generate-video`: Đẩy job tạo video từ ý tưởng vào BullMQ Queue.
+
+### 5. `ProductsModule` (`backend/src/modules/products/`)
+* **Controller:** `ProductsController` (`@Controller('products')`).
+* **Endpoints:**
+  - `POST /api/products`: Thêm sản phẩm Affiliate mới thủ công.
+  - `GET /api/products`: Danh sách sản phẩm Affiliate.
+  - `GET /api/products/:id`: Chi tiết sản phẩm.
+  - `PATCH /api/products/:id`: Cập nhật sản phẩm.
+  - `DELETE /api/products/:id`: Xóa sản phẩm.
+  - `POST /api/products/:id/generate-video`: Kích hoạt tạo video 9:16 trực tiếp cho sản phẩm (truyền thông tin sản phẩm sang Python CLI).
+
+### 6. `ProductResearchModule` (`backend/src/modules/product-research/`)
+* **Controller:** `ProductResearchController`.
+* **Endpoints:**
+  - `POST /api/products/research`: Cào dữ liệu & phân tích AI sản phẩm từ URL (Shopee, Lazada, TikTok Shop, Amazon hoặc Web bất kỳ).
+  - `POST /api/product-research`: Endpoint legacy cho cào sản phẩm.
+  - `GET /api/products/:id/research`: Lấy trạng thái nghiên cứu sản phẩm (`PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `PARTIAL`).
+* **Cơ chế Adapter Scraper:**
+  - `ShopeeAdapter`: Trích xuất dữ liệu sản phẩm Shopee.
+  - `LazadaAdapter`: Trích xuất dữ liệu Lazada.
+  - `TikTokShopAdapter`: Trích xuất dữ liệu TikTok Shop.
+  - `AmazonAdapter`: Trích xuất dữ liệu Amazon.
+  - `GenericProductAdapter`: Fallback dùng JSDOM/cheerio parse meta tags, OpenGraph (`og:title`, `og:image`, `og:price`) và microdata HTML.
+* **Quy trình AI Research:**
+  - `ProductAnalysisService`: Đưa raw data sang Gemini/OpenAI phân tích USP, tính năng, lợi ích, rào cản mua hàng, nhóm khách hàng mục tiêu và 3-5 góc truyền thông (Marketing Angles).
+  - `ContentBriefService`: Tạo bản tóm tắt nội dung bán hàng tái sử dụng (Content Brief).
+  - Khởi tạo background job trong BullMQ queue `product-research` (hoặc fallback async inline execution nếu Redis bận).
+
+### 7. `ProductVisualsModule` (`backend/src/modules/product-visuals/`)
+* **Service:** `ProductVisualsService`.
+* **Tính năng:** Thu thập hình ảnh sản phẩm từ URL, crop/pad theo tỷ lệ 9:16, tối ưu dung lượng và chuyển giao cho Python Video Engine để tạo hiệu ứng chuyển cảnh động.
+
+### 8. `ContentStrategyModule` (`backend/src/modules/content-strategy/`)
+* **Controller:** `ContentStrategyController`.
+* **Endpoints:**
+  - `POST /api/products/:id/content-ideas/generate`: Tự động sinh hàng loạt Ý tưởng Nội dung (`ContentIdea`) từ kết quả phân tích sản phẩm.
+  - `GET /api/products/:id/content-ideas`: Danh sách các ý tưởng nội dung của sản phẩm.
+  - `GET /api/content-ideas/:id`: Lấy chi tiết ý tưởng nội dung.
+  - `DELETE /api/content-ideas/:id`: Xóa ý tưởng nội dung.
+  - `POST /api/content-ideas/:id/generate-video`: Sinh video từ ý tưởng nội dung cụ thể.
+* **12 Dạng Nội Dung Bán Hàng Hỗ Trợ:** `product_review`, `problem_solution`, `comparison`, `listicle`, `educational`, `storytelling`, `testimonial`, `myth_busting`, `use_case`, `value_for_money`, `pros_cons`, `FAQ`.
+
+### 9. `ScriptEngineModule` (`backend/src/modules/script-engine/`)
+* **Controller:** `ScriptEngineController`.
+* **Endpoints:**
+  - `POST /api/content-ideas/:id/generate-script`: Tạo kịch bản chi tiết đa phân cảnh (`VideoScript`) từ `ContentIdea`.
+  - `GET /api/content-ideas/:id/scripts`: Danh sách kịch bản của `ContentIdea`.
+  - `GET /api/products/:id/scripts`: Danh sách kịch bản của sản phẩm.
+  - `GET /api/scripts/:id`: Chi tiết kịch bản.
+  - `POST /api/scripts/:id/generate-video`: Render video từ kịch bản đã duyệt.
+* **Cấu trúc VideoScript Output:** Gồm `duration` (30s/45s/60s), `hook` (câu mở đầu 3s), `cta` (câu kêu gọi mua hàng), và `scenes` (mảng phân cảnh gồm mô tả hình ảnh `visualHint`, giọng đọc `narration`, thời lượng `durationSeconds`).
+
+### 10. `JobsModule` (`backend/src/modules/jobs/`)
+* **Controller:** `JobsController` (`@Controller('jobs')`).
+* **Endpoints:**
+  - `GET /api/jobs`: Lấy danh sách tiến trình render video.
+  - `GET /api/jobs/:id`: Chi tiết tiến trình job & phần trăm progress (0-100%).
+  - `GET /api/jobs/:id/logs`: Lấy danh sách dòng log thời gian thực (`JobLog`).
+  - `POST /api/jobs/:id/cancel`: Hủy tiến trình job đang chạy.
+  - `POST /api/jobs/:id/retry`: Thử lại job bị thất bại.
+
+### 11. `QueueModule` (`backend/src/modules/queue/`)
+* **Cấu trúc:** BullMQ Task Queue System sử dụng Redis.
+* **3 Task Queues:**
+  1. `video-generation`: Quản lý tiến trình render video Python.
+  2. `product-research`: Quản lý cào & phân tích dữ liệu sản phẩm.
+  3. `publish-job`: Lập lịch & điều phối đăng video lên TikTok, YouTube, Instagram, Facebook.
+* **File quan trọng — `video.processor.ts` (`VideoProcessor`):**
+  - Worker lắng nghe queue `video-generation`.
+  - Cập nhật DB `GenerationJob` -> `running`.
+  - Thực thi Child Process CLI: `uv run --project engine python engine/cli.py --video-subject ... --product-data ...`
+  - Đọc dòng `stdout`/`stderr` theo thời gian thực để phân tích tiến độ (`## generating audio` -> progress = 35%, v.v.).
+  - Ghi log liên tục vào bảng `JobLog`.
+  - Khi CLI xong, dùng `fluent-ffmpeg` tạo thumbnail `.jpg`.
+  - Upload `final-1.mp4`, `thumbnail.jpg`, `subtitle.srt`, `script.json` lên MinIO bucket `videos`.
+  - Tạo record mới trong bảng `Video` và cập nhật `GenerationJob` -> `completed` (progress = 100%).
+  - Dọn dẹp thư mục tạm `engine/storage/tasks/{jobId}/`.
+
+### 12. `VideosModule` (`backend/src/modules/videos/`)
+* **Controller:** `VideosController` (`@Controller('videos')`).
+* **Endpoints:**
+  - `GET /api/videos`: Lấy danh sách video đã tạo thành công.
+  - `GET /api/videos/:id`: Lấy thông tin video & URL phát media (presigned MinIO URL).
+  - `DELETE /api/videos/:id`: Xóa video & xóa file liên quan trên MinIO.
+
+### 13. `SettingsModule` (`backend/src/modules/settings/`)
+* **Controller:** `SettingsController` (`@Controller('settings')`).
+* **Endpoints:**
+  - `GET /api/settings`: Lấy danh sách cấu hình hệ thống.
+  - `GET /api/settings/:key`: Lấy giá trị cấu hình theo key.
+  - `POST /api/settings`: Lưu hoặc cập nhật key-value cấu hình.
+
+### 14. `PublishingModule` (`backend/src/modules/publishing/`)
+* **Controller:** `PublishingController` (`@Controller('api/publishing')`).
+* **Endpoints:**
+  - `GET /api/publishing/accounts`: Danh sách tài khoản mạng xã hội đã kết nối.
+  - `POST /api/publishing/accounts`: Thêm tài khoản mạng xã hội thủ công.
+  - `DELETE /api/publishing/accounts/:id`: Ngắt kết nối tài khoản.
+  - `GET /api/publishing/accounts/:platform/connect`: Lấy URL OAuth authorization kết nối tài khoản.
+  - `GET /api/publishing/accounts/:platform/callback`: Xử lý OAuth callback lưu token.
+  - `POST /api/publishing/jobs`: Tạo lịch đăng video mới (`PublishJob`).
+  - `GET /api/publishing/jobs`: Danh sách nhiệm vụ đăng bài.
+  - `GET /api/publishing/jobs/:id`: Chi tiết nhiệm vụ đăng bài.
+  - `POST /api/publishing/jobs/:id/retry`: Đăng lại bài bị lỗi.
+  - `POST /api/publishing/jobs/:id/cancel`: Hủy lịch đăng bài.
+* **Platform Adapters (`backend/src/modules/publishing/adapters/`):**
+  - `TikTokAdapter`: Tích hợp TikTok Content Posting API v2.
+  - `YouTubeAdapter`: Tích hợp YouTube Data API v3 (Videos.insert).
+  - `InstagramAdapter`: Tích hợp Instagram Graph API (Container upload & media publish).
+  - `FacebookAdapter`: Tích hợp Facebook Graph API (VideoReels publish).
+
+### 15. `AnalyticsModule` (`backend/src/modules/analytics/`)
+* **Controller:** `AnalyticsController` (`@Controller('api/analytics')`).
+* **Endpoints:**
+  - `GET /api/analytics/overview`: Tổng quan chỉ số tương tác hệ thống (tổng views, likes, comments, shares, saves, clicks, avg watch time, engagement rate).
+  - `GET /api/analytics/top-performing`: Top video/bài viết có hiệu suất cao nhất.
+  - `GET /api/analytics/platforms/:platform`: Báo cáo chỉ số theo từng nền tảng (TikTok, YouTube, Instagram, Facebook).
+  - `GET /api/analytics/videos/:videoId`: Chỉ số chi tiết của 1 video.
+  - `GET /api/analytics/posts/:postId`: Chỉ số của 1 bài đăng cụ thể.
+  - `POST /api/analytics/collect/:jobId`: Kích hoạt thu thập dữ liệu analytics tức thời cho bài đăng.
+
+---
+
+## Phần D — Phân Tích Chi Tiết Python Core Video Engine
+
+Engine Python là trái tim xử lý đồ họa và âm thanh của hệ thống.
+
+### 1. Structure của Python Engine (`engine/`)
+* `cli.py`: Entry point dòng lệnh chính.
+* `main.py`: Entry point FastAPI Web Server (`uvicorn app.asgi:app --host 0.0.0.0 --port 8080`).
+* `app/models/schema.py`: Chứa các dataclass quan trọng:
+  - `VideoParams`: Chứa toàn bộ tham số sinh video (`video_subject`, `video_script`, `video_terms`, `video_aspect`, `voice_name`, `subtitle_enabled`, `product_data`, v.v.).
+  - `MaterialInfo`: Chứa thông tin clip/ảnh stock hoặc local (`provider`, `url`, `duration`).
+
+### 2. Chi tiết các tham số của CLI (`engine/cli.py`)
+CLI được thiết kế cực kỳ linh hoạt với hơn 30 tham số:
+```bash
+uv run --project engine python engine/cli.py \
+  --video-subject "Top 3 Đồ Gia Dụng Thông Minh" \
+  --video-script "..." \
+  --video-aspect "9:16" \
+  --voice-name "vi-VN-HoaiMyNeural" \
+  --voice-rate 1.0 \
+  --voice-volume 1.0 \
+  --subtitle-enabled \
+  --font-name "BeVietnamPro-Bold.ttf" \
+  --font-size 60 \
+  --text-fore-color "#FFFFFF" \
+  --stroke-color "#000000" \
+  --stroke-width 2.0 \
+  --bgm-type "random" \
+  --bgm-volume 0.15 \
+  --video-source "pexels" \
+  --stop-at "video" \
+  --task-id "<jobId>" \
+  --product-data '{"name":"Nồi Chiên Không Dầu","price":"1.290.000đ","affiliateUrl":"..."}'
+```
+
+### 3. Phân tích các Service Core trong Python Engine (`engine/app/services/`)
+
+#### Service 1: `task.py` (Task Orchestrator)
+* **Vai trò:** Bộ điều phối luồng 6 bước độc lập:
+  1. `generate_script()`: Gọi LLM sinh văn bản kịch bản (Nếu chưa truyền kịch bản sẵn). Nếu có `product_data`, tự động sử dụng Affiliate Sales Prompt.
+  2. `generate_terms()`: Gọi LLM trích xuất 5-8 từ khóa tiếng Anh tìm B-roll trên Pexels/Pixabay.
+  3. `generate_audio()`: Gọi TTS sinh file âm thanh `audio.mp3`.
+  4. `generate_subtitle()`: Sinh file phụ đề `subtitle.srt` từ luồng Edge-TTS SubMaker hoặc Whisper.
+  5. `get_video_materials()`: Tải các clip stock từ Pexels/Pixabay hoặc tự động chuyển đổi ảnh sản phẩm trong `product_data` thành clip 9:16.
+  6. `generate_final_videos()`: Gọi `video.combine_videos()` và `video.generate_video()` để render MP4 cuối cùng.
+* Hỗ trợ cờ `--stop-at` (`script`, `terms`, `audio`, `subtitle`, `materials`, `video`) phục vụ việc dừng sớm để debug.
+
+#### Service 2: `llm.py` (LLM Provider Service)
+* **Hàm cốt lõi:** `_generate_response(prompt: str) -> str`.
+* **Cơ chế:** Thiết kế theo **Strategy Pattern**, kiểm tra cấu hình `llm_provider` và gọi SDK tương ứng.
 * **Chi tiết Gemini (`gemini` provider):**
-  - Sử dụng thư viện `google.generativeai`.
-  - Cấu hình qua `config.toml`: `gemini_api_key`, `gemini_model_name` (mặc định `gemini-2.5-flash`).
-  - Hỗ trợ đổi `base_url` nếu qua proxy.
-* **Được gọi bởi:** `engine/app/services/task.py`.
+  - Dùng thư viện `google.generativeai`.
+  - Model mặc định: `gemini-2.5-flash`.
+  - Tích hợp `DEFAULT_AFFILIATE_SYSTEM_PROMPT` thiết kế chuẩn cho kịch bản bán hàng Affiliate:
+    - **HOOI (0-3s)**: Gây chú ý lập tức.
+    - **PROBLEM (3-8s)**: Nêu rào cản/nỗi đau của khách hàng.
+    - **SOLUTION (8-20s)**: Giới thiệu sản phẩm như một giải pháp tối ưu.
+    - **BENEFITS (20-35s)**: Điểm mạnh cốt lõi & USP.
+    - **REASON (35-45s)**: Lý do phải mua ngay (giảm giá/ưu đãi).
+    - **CTA (45-55s)**: Kêu gọi click link ở tiểu sử / comment.
 
-#### File 5: `engine/app/services/voice.py`
-* **Vai trò:** Xử lý chuyển đổi văn bản thành giọng nói (TTS) và căn chỉnh thời gian phụ đề.
-* **Function quan trọng:**
-  - `tts(text, voice_name, voice_rate, voice_file)`: Router phân phối đến provider tương ứng (`azure_tts_v1`, `azure_tts_v2`, `gemini_tts`, `siliconflow_tts`, `mimo_tts`, `elevenlabs_tts`).
-  - `azure_tts_v1(...)`: Mặc định gọi thư viện **`edge_tts`** (Miễn phí hoàn toàn, không cần API Key).
-  - `create_subtitle(...)`: Sử dụng đối tượng `SubMaker` từ Edge-TTS để tạo timestamp cho phụ đề.
-* **Được gọi bởi:** `engine/app/services/task.py`.
+#### Service 3: `voice.py` (TTS Service)
+* **Hàm cốt lõi:** `tts(text, voice_name, voice_rate, voice_file)`.
+* **Các Provider:**
+  - `azure_tts_v1` (**Edge-TTS — Mặc định**): Miễn phí 100%, không cần API Key, sử dụng giọng đọc mượt mà (`vi-VN-HoaiMyNeural`, `vi-VN-NamMinhNeural`).
+  - `azure_tts_v2`: Azure Speech SDK chính thức.
+  - `gemini_tts`: Giọng nói từ Google Cloud Gemini.
+  - `siliconflow_tts`: CosyVoice2 model.
+  - `elevenlabs_tts`: ElevenLabs API.
+  - `openai_tts`: OpenAI TTS-1.
 
-#### File 6: `engine/app/services/material.py`
-* **Vai trò:** Phụ trách tìm kiếm và download clip B-roll từ Cloud API.
-* **Function quan trọng:**
-  - `search_videos_pexels(search_term, minimum_duration, video_aspect)`: Gọi Pexels Video Search API.
-  - `search_videos_pixabay(...)`: Gọi Pixabay Video API.
-  - `search_videos_coverr(...)`: Gọi Coverr Video API.
-  - `download_videos(...)`: Quản lý vòng lặp tải clip về thư mục tạm `engine/storage/tasks/{task_id}/materials/`.
-* **Được gọi bởi:** `engine/app/services/task.py`.
+#### Service 4: `material.py` (Material & Stock Media Manager)
+* **Cơ chế:**
+  - `search_videos_pexels()`: Gọi Pexels Video API (Hỗ trợ xoay vòng mảng API keys tự động).
+  - `search_videos_pixabay()`: Gọi Pixabay API.
+  - `search_videos_coverr()`: Gọi Coverr API.
+  - `process_product_images()`: Khi có `product_data` chứa mảng URL ảnh sản phẩm, tự động tải về, crop/pad thành khung hình 9:16 (1080x1920) và chuyển đổi thành các clip video ngắn (3 giây) có hiệu ứng Zoom/Pan tĩnh.
 
-#### File 7: `engine/app/services/video.py`
-* **Vai trò:** Core Render Engine xử lý đồ họa, cắt ghép clip và ghi đè âm thanh/phụ đề.
-* **Function quan trọng:**
-  - `combine_videos()`: Cắt ngắn các clip B-roll, thay đổi tỉ lệ (Crop/Resize 9:16), nối lại thành clip dài bằng thời lượng audio (`combined-1.mp4`).
-  - `generate_video()`: Ghép `combined-1.mp4` với `audio.mp3`, ghi phụ đề chữ bằng MoviePy/Pillow (`TextClip`/`SubtitlesClip`), thêm nhạc nền BGM và xuất file `final-1.mp4`.
-* **Được gọi bởi:** `engine/app/services/task.py`.
+#### Service 5: `subtitle.py` (Subtitle Engine)
+* Tự động chuyển đổi dữ liệu timestamp từ Edge-TTS thành chuẩn file `.srt`.
+* Hỗ trợ gộp đoạn văn bản và căn chỉnh thời lượng hiển thị từng dòng chữ.
 
----
-
-## Phần C — Trace Toàn Bộ Flow Tạo Một Video (End-to-End Flow)
-
-Dưới đây là luồng thực thi chi tiết từ khi người dùng nhập thông tin trên giao diện cho đến khi file video `.mp4` được upload lên MinIO và hiển thị trên màn hình:
-
-```text
-[User trên Browser]
-       │ (1) Nhập Topic / Chọn Voice / Chọn Khung hình (9:16)
-       ▼
-[Frontend: Next.js]
-       │ (2) POST /api/ideas (tạo ý tưởng) hoặc POST /api/jobs (tạo job)
-       ▼
-[Backend API: NestJS Controller] (`backend/src/modules/ideas/ideas.controller.ts`)
-       │ (3) Tạo record Idea & GenerationJob trong PostgreSQL (Status: "queued")
-       │ (4) Dispatch job vào BullMQ Queue ("video-generation")
-       ▼
-[Queue Worker: VideoProcessor] (`backend/src/modules/queue/video.processor.ts`)
-       │ (5) Chuyển Job status -> "running"
-       │ (6) Spawns Child Process:
-       │     `uv run --project engine python engine/cli.py --video-subject "..." --task-id "<jobId>"`
-       ▼
-[Python Engine CLI] (`engine/cli.py`)
-       │ (7) Parse CLI Arguments & tạo object `VideoParams`
-       │ (8) Gọi `tm.start(task_id, params)`
-       ▼
-[Python Task Service] (`engine/app/services/task.py`)
-       ├─► [LLM Module] (`engine/app/services/llm.py`)
-       │     │ (9) Sinh Kịch Bản: Gọi Gemini API (`gemini-2.5-flash`)
-       │     │ (10) Sinh Term Tìm Kiếm: Gemini bóc tách từ khóa (ví dụ: "coffee maker, espresso pouring")
-       │     └─ Output: Save vào `engine/storage/tasks/{jobId}/script.json`
-       │
-       ├─► [TTS Module] (`engine/app/services/voice.py`)
-       │     │ (11) Tạo Audio: Gọi Edge-TTS (`azure_tts_v1`) sinh giọng đọc
-       │     └─ Output: Save vào `engine/storage/tasks/{jobId}/audio.mp3`
-       │
-       ├─► [Subtitle Module] (`engine/app/services/subtitle.py` & `voice.py`)
-       │     │ (12) Tạo Phụ đề: Trích xuất timestamp từ Edge-TTS `SubMaker`
-       │     └─ Output: Save vào `engine/storage/tasks/{jobId}/subtitle.srt`
-       │
-       ├─► [Material Module] (`engine/app/services/material.py`)
-       │     │ (13) Tải B-roll: Gọi Pexels/Pixabay API theo `search_terms`
-       │     └─ Output: Save các file clip vào `engine/storage/tasks/{jobId}/materials/`
-       │
-       └─► [Video Engine] (`engine/app/services/video.py`)
-             │ (14) Nối Video: Crop/Resize 1080x1920 (9:16), nối clip -> `combined-1.mp4`
-             │ (15) Render Cuối: Trộn `combined-1.mp4` + `audio.mp3` + `subtitle.srt` + BGM -> `final-1.mp4`
-             └─ Output: `engine/storage/tasks/{jobId}/final-1.mp4`
-       ▼
-[Python Engine CLI Hoàn Thành] (Exit Code 0)
-       ▼
-[Queue Worker: VideoProcessor] (Tiếp tục xử lý sau CLI)
-       │ (16) Đọc log `stdout`/`stderr` phát hiện CLI xong
-       │ (17) Dùng FFmpeg chụp thumbnail từ `final-1.mp4` -> `thumbnail.jpg`
-       │ (18) Upload `final-1.mp4`, `thumbnail.jpg`, `subtitle.srt`, `script.json` lên MinIO Storage
-       │ (19) Ghi record mới vào bảng `Video` trong PostgreSQL
-       │ (20) Cập nhật trạng thái `GenerationJob` -> "completed" (progress = 100%)
-       │ (21) Xóa thư mục tạm `engine/storage/tasks/{jobId}/`
-       ▼
-[Frontend Dashboard]
-       │ (22) React Query Polling API phát hiện Job completed -> Reload giao diện & Play Video từ MinIO
-```
+#### Service 6: `video.py` (MoviePy & FFmpeg Video Renderer)
+* `combine_videos()`: Cắt ngẫu nhiên các clip stock/ảnh sản phẩm thành các đoạn 2-4s, crop về tỉ lệ 1080x1920 (9:16) và concat lại sao cho thời lượng video đúng bằng thời lượng file âm thanh `audio.mp3` (`combined-1.mp4`).
+* `generate_video()`: Trộn `combined-1.mp4` với `audio.mp3`, vẽ chữ phụ đề tiếng Việt bằng Pillow (`TextClip`/`SubtitlesClip`), đè nhạc nền BGM (giảm volume BGM xuống 15%) và gọi FFmpeg render file đầu ra `final-1.mp4`.
 
 ---
 
-## Phần D — AI Provider Architecture (LLM)
+## Phần E — Database Schema & Data Models (PostgreSQL + Prisma ORM)
 
-### 1. Danh sách các Provider hỗ trợ hiện tại
-Codebase hỗ trợ rất nhiều LLM Provider thông qua lớp trừu tượng `_generate_response()` trong file `engine/app/services/llm.py`:
-* **Cloud API Trực tiếp:** `gemini`, `openai`, `azure`, `qwen`, `moonshot`, `deepseek`, `minimax`, `volcengine`, `mimo`, `ernie`, `modelscope`, `grok`, `groq`, `cloudflare`, `pollinations`.
-* **Cloud Gateway / Aggregator:** `aihubmix`, `aimlapi`, `evolink`, `oneapi`, `litellm`.
-* **Local Inference:** `ollama` (Chạy model local qua Ollama server).
-* **Reverse-engineered (Cảnh báo không dùng):** `g4f` (mặc định bị disable).
-
-### 2. Phân tích chi tiết vị trí & cơ chế gọi Google Gemini
-* **File chứa logic gọi Gemini:** `engine/app/services/llm.py` (từ dòng 398 đến dòng 450).
-* **Nơi cấu hình API Key:**
-  - File `config.toml` (hoặc `config.example.toml` mẫu):
-    ```toml
-    [app]
-    llm_provider = "gemini"
-    gemini_api_key = "AIzaSy..."
-    gemini_model_name = "gemini-2.5-flash"
-    gemini_base_url = "" # Để trống nếu gọi trực tiếp Google Cloud API
-    ```
-* **Cơ chế Abstraction:**
-  Hệ thống **đã có lớp trừu tượng (Abstraction Interface)** hoàn chỉnh. Hàm `_generate_response(prompt)` hoạt động theo pattern **Strategy**:
-  ```python
-  # Trong engine/app/services/llm.py
-  llm_provider = config.app.get("llm_provider", "openai")
-  if llm_provider == "gemini":
-      import google.generativeai as genai
-      genai.configure(api_key=api_key, transport="rest")
-      model = genai.GenerativeModel(model_name=model_name, ...)
-      response = model.generate_content(prompt)
-      return _normalize_text_response(generated_text, llm_provider)
-  ```
-* **Khả năng thay đổi Provider:** Cực kỳ dễ dàng. Chỉ cần đổi giá trị `llm_provider = "gemini"` trong `config.toml` hoặc chọn provider qua UI API mà không cần sửa một dòng code nào của video engine.
-
----
-
-## Phần E — TTS Pipeline (Text-to-Speech)
-
-### 1. Các TTS Provider đang hỗ trợ trong Codebase
-Codebase tại `engine/app/services/voice.py` hỗ trợ các provider:
-1. **Edge TTS (Azure V1 - Mặc định):** Sử dụng thư viện Python `edge_tts`. **Miễn phí 100%**, không cần API Key, không giới hạn ký tự khắt khe, chất lượng giọng tiếng Việt (`vi-VN-HoaiMyNeural`, `vi-VN-NamMinhNeural`) rất mượt.
-2. **Azure TTS V2:** Dùng Azure Speech SDK chính thức (Cần `speech_key` và `speech_region`).
-3. **SiliconFlow TTS:** Dùng model `CosyVoice2`.
-4. **Gemini TTS:** Dùng giọng Gemini Cloud (`gemini:Zephyr-Female`, `gemini:Puck-Male`,...).
-5. **Xiaomi MiMo TTS:** Dùng `mimo-v2.5-tts`.
-6. **ElevenLabs TTS:** Dùng ElevenLabs API (`elevenlabs:{voice_id}`).
-7. **OpenAI TTS:** Dùng `tts-1` / `tts-1-hd`.
-8. **Chatterbox TTS:** Tự host server Chatterbox.
-
-### 2. Đánh giá tính phù hợp với máy yếu & Yêu cầu Cloud/Free TTS
-> **ĐÁNH GIÁ:** Architecture TTS của dự án **CỰC KỲ PHÙ HỢP** với yêu cầu của bạn.
-* Mặc định dự án dùng **Edge TTS (`azure_tts_v1`)** hoàn toàn chạy trên Cloud của Microsoft, **không tiêu tốn CPU/GPU local**, **không cần tải model local**, và **không tốn tiền API key**.
-* File âm thanh xuất ra lưu tại `engine/storage/tasks/{task_id}/audio.mp3`.
-* Pipeline đọc duration trực tiếp từ file MP3 thông qua `AudioFileClip` hoặc `pydub` để căn chỉnh độ dài video B-roll.
-
----
-
-## Phần F — Image / Video / Stock Media Pipeline
-
-### 1. Cơ chế tìm kiếm & Tải Footage B-roll
-Tất cả logic tìm kiếm media nằm ở `engine/app/services/material.py` và `engine/app/services/video.py`:
-
-```text
-1. LLM tách Kịch bản -> 5-8 từ khóa (search_terms)
-                         ↓
-2. material.download_videos() duyệt từng term
-                         ↓
-3. Gọi API Cloud (Pexels / Pixabay / Coverr)
-                         ↓
-4. Download video clips về folder: `engine/storage/tasks/{task_id}/materials/`
-                         ↓
-5. video.combine_videos() xử lý Crop 9:16 & Cắt ngắn từng clip
-                         ↓
-6. Nối các clip đã cắt thành video dài bao phủ toàn bộ thời lượng Audio
-```
-
-### 2. Hướng dẫn tùy biến logic cho Affiliate Product Video
-Hiện tại, dự án dùng từ khóa tổng quan để tải B-roll ngẫu nhiên. Để biến hệ thống thành Affiliate Video, bạn sẽ cần:
-1. Cho phép đầu vào là danh sách hình ảnh/video thực tế của **Sản phẩm** (Product Footage/Images).
-2. Khi `params.video_source == "local"`, hệ thống gọi hàm `video.preprocess_video()` ở `engine/app/services/video.py`.
-3. Bạn có thể mở rộng logic này để tải hình ảnh sản phẩm từ URL Affiliate/Shopee/TikTok Shop, sau đó dùng Pillow/MoviePy biến ảnh tĩnh thành video clip ngắn (Dynamic Zoom / Pan effect) để ghép vào pipeline.
-
----
-
-## Phần G — Subtitle Engine
-
-### 1. Cơ chế tạo phụ đề
-Hệ thống hỗ trợ 2 chế độ tạo phụ đề (cấu hình qua `subtitle_provider` trong `config.toml`):
-* **Mode `edge` (Mặc định - Khuyên dùng):** Trích xuất timestamp từ luồng WebSocket của Edge-TTS (`SubMaker`). Chạy cực nhanh trên Cloud, **không tốn GPU**, không cần tải model local.
-* **Mode `whisper` (Local model):** Dùng `faster-whisper` phiên bản local để tự transcode file audio.mp3. (Cách này yêu cầu tải model 250MB - 3GB và tốn CPU/GPU local => **Không nên dùng** với máy yếu).
-
-### 2. Format & Styling phụ đề
-* **Format xuất ra:** File chuẩn SRT (`engine/storage/tasks/{task_id}/subtitle.srt`).
-* **Đốt phụ đề vào Video (Subtitle Burn-in):** Thực hiện ở `engine/app/services/video.py` hàm `generate_video()` sử dụng `SubtitlesClip` của MoviePy kết hợp với **Pillow (PIL)**.
-* **Các thuộc tính Subtitle có thể Custom hiện tại:**
-  - Font chữ (`font_name`): Lấy từ `engine/resource/fonts/` (Đã hỗ trợ font tiếng Việt `BeVietnamPro-Bold.ttf`).
-  - Cỡ chữ (`font_size`).
-  - Màu chữ (`text_fore_color` - Dạng Hex `#FFFFFF`).
-  - Viền chữ (`stroke_color`, `stroke_width`).
-  - Vị trí (`subtitle_position`: `top`, `center`, `bottom`, `custom`).
-  - Nền phụ đề (`text_background_color`, `rounded_subtitle_background`).
-
-### 3. Đánh giá cho Subtitle kiểu TikTok/Shorts
-* Kiến trúc hiện tại của `video.py` đã hỗ trợ render viền chữ, màu chữ và nền bo tròn.
-* Để làm phụ đề dạng **nổi bật từng từ (Word-by-word highlight)** kiểu TikTok/Shorts nâng cao, bạn có thể tùy biến hàm render text clip trong `video.py` mà không làm ảnh hưởng đến toàn bộ pipeline phía trên.
-
----
-
-## Phần H — Video Rendering Engine
-
-### 1. Công nghệ rendering thực tế
-Repository **KHÔNG** sử dụng Remotion hay OpenCV. Hệ thống sử dụng kết hợp:
-* **MoviePy 2.x:** Quản lý Timeline, sắp xếp lớp âm thanh (Audio tracks) và lớp hình ảnh/video (Video tracks).
-* **FFmpeg:** Đảm nhiệm việc ghép nối thô (concat), mã hóa file (encoding), và xuất file MP4 cuối cùng.
-* **Pillow (PIL):** Render text và đồ họa phụ đề chất lượng cao thành Frame Image trước khi đưa vào MoviePy.
-
-### 2. Thông số Video mặc định
-* **Độ phân giải (Resolution):** 
-  - Khung dọc 9:16: `1080x1920` (Chuẩn TikTok / Shorts / Reels).
-  - Khung ngang 16:9: `1920x1080`.
-* **Tốc độ khung hình (FPS):** `30 FPS`.
-* **Video Codec:** `libx264` (H.264 CPU software encoder - Tương thích 100% với mọi hệ thống Linux/Windows).
-* **Audio Codec:** `aac`, bitrate `192k`.
-* **File tạm:** Lưu ở `engine/storage/tasks/{jobId}/` (`combined-1.mp4`, `final-1.mp4`, `audio.mp3`, `subtitle.srt`).
-* **File output:** Tải lên MinIO S3 storage (`videos/{jobId}/final.mp4`).
-
-### 3. Đánh giá khả năng chạy trên Linux Mint Máy Yếu
-> **KẾT LUẬN: CHẠY TỐT 100%.**
-* Do toàn bộ bước nặng nhất (AI LLM, Voice TTS, Stock Media Search) đều dùng **Cloud API**, máy Linux Mint của bạn **chỉ tốn CPU ở bước FFmpeg Encode cuối cùng**.
-* Một video ngắn 30-60 giây render bằng `libx264` trên CPU 4 nhân bình thường chỉ tốn khoảng 30 - 60 giây rendering. RAM chiếm dụng dưới 2GB.
-
----
-
-## Phần I — Database Và Storage Architecture
-
-### 1. Cấu trúc Database Hiện Tại (PostgreSQL + Prisma ORM)
-File schema duy nhất tại `backend/prisma/schema.prisma` định nghĩa 5 bảng:
+File Schema duy nhất tại `backend/prisma/schema.prisma` định nghĩa **11 Database Models** hoàn chỉnh:
 
 ```mermaid
 erDiagram
+    Product ||--o{ Idea : "references"
+    Product ||--o{ GenerationJob : "references"
+    Product ||--o{ ContentIdea : "has many"
+    Product ||--o{ VideoScript : "has many"
+    ContentIdea ||--o{ VideoScript : "has many"
     Idea ||--o{ GenerationJob : "has many"
     Idea ||--o{ Video : "has many"
     GenerationJob ||--o{ Video : "produces"
     GenerationJob ||--o{ JobLog : "generates"
+    Video ||--o{ PublishJob : "published via"
+    PlatformAccount ||--o{ PublishJob : "uses"
+    PublishJob ||--o{ PostAnalytics : "tracks"
 
     Idea {
         string id PK
@@ -417,13 +412,48 @@ erDiagram
         string description
         string script
         string language
-        string[] tags
         string status
+        string productId FK
+    }
+
+    Product {
+        string id PK
+        string name
+        string brand
+        string category
+        string price
+        string affiliateUrl
+        string sourcePlatform
+        string[] images
+        string[] features
+        string researchStatus
+    }
+
+    ContentIdea {
+        string id PK
+        string productId FK
+        string title
+        string contentType
+        string marketingAngle
+        string hook
+        string status
+    }
+
+    VideoScript {
+        string id PK
+        string productId FK
+        string contentIdeaId FK
+        string title
+        int duration
+        string hook
+        json scenes
+        string cta
     }
 
     GenerationJob {
         string id PK
         string ideaId FK
+        string productId FK
         string status
         float progress
         string errorMessage
@@ -435,11 +465,10 @@ erDiagram
         string ideaId FK
         string jobId FK
         string title
-        string script
         string videoObjectKey
         string thumbnailObjectKey
         string subtitleObjectKey
-        string metadataObjectKey
+        float duration
     }
 
     JobLog {
@@ -449,87 +478,312 @@ erDiagram
         string message
     }
 
-    SystemSetting {
-        string key PK
-        string value
+    PlatformAccount {
+        string id PK
+        string platform
+        string accountName
+        string status
+    }
+
+    PublishJob {
+        string id PK
+        string videoId FK
+        string platformAccountId FK
+        string platform
+        string status
+        datetime scheduledAt
+    }
+
+    PostAnalytics {
+        string id PK
+        string publishJobId FK
+        bigint views
+        int likes
+        int comments
+        int shares
+        float engagementRate
     }
 ```
 
-### 2. Đánh giá & Đề xuất Schema cho Hệ thống Affiliate Video Automation
-Để phát triển hệ thống Affiliate Video, bạn **NÊN BỔ SUNG DATABASE** thay vì chỉ dùng filesystem. Dưới đây là đề xuất các Entity bổ sung (chỉ ở mức Architecture, chưa sửa code):
+---
 
-```prisma
-// Entity Quản lý Sản Phẩm Affiliate
-model Product {
-  id              String   @id @default(uuid())
-  title           String   // Tên sản phẩm
-  productUrl      String   // Link sản phẩm gốc (Shopee, Lazada, TikTok Shop)
-  affiliateUrl    String   // Link Affiliate chứa ID hoa hồng
-  price           String?  // Giá bán / Giảm giá
-  features        String[] // Danh sách tính năng nổi bật / USP
-  images          String[] // Danh sách URL hình ảnh sản phẩm
-  category        String?
-  createdAt       DateTime @default(now())
-  
-  marketingAngles MarketingAngle[]
-}
+## Phần F — Queue System, Task Worker & Cơ Chế Phục Hồi Lỗi (Error Recovery)
 
-// Entity Phân tích Marketing Angle cho Sản Phẩm
-model MarketingAngle {
-  id          String   @id @default(uuid())
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  angleTitle  String   // Ví dụ: "Giải pháp cho người bận rộn", "So sánh giá"
-  hookText    String   // Câu Hook 3s đầu tiên
-  targetAudience String?
-  scripts     Idea[]
-}
+### 1. Cấu trúc Queue & Worker (BullMQ + Redis)
+Hệ thống vận hành 3 BullMQ Queues chính trong backend:
+1. Queue `video-generation`: Nhận payload `VideoJobPayload` (chứa `jobId`, `ideaId`, `productId`, `config`). Xử lý bởi `VideoProcessor` (`backend/src/modules/queue/video.processor.ts`).
+2. Queue `product-research`: Nhận payload `ProductResearchJobPayload` (chứa `productId`, `url`). Xử lý bởi `ProductResearchProcessor`.
+3. Queue `publish-job`: Lập lịch và phát các tiến trình đăng video lên mạng xã hội.
+
+### 2. Vòng đời xử lý Job của `VideoProcessor`
+```text
+[BullMQ Video Job Queued]
+          │
+          ▼
+[Worker VideoProcessor.process()]
+          │
+          ├─► 1. Đánh dấu DB GenerationJob -> status = "running", progress = 5%
+          ├─► 2. Khởi tạo thư mục tạm: engine/storage/tasks/{jobId}/
+          ├─► 3. Spawns Child Process: `uv run --project engine python engine/cli.py ...`
+          │
+          ├─► 4. Đọc stdout/stderr từng dòng theo thời gian thực (Real-time Stream):
+          │       - Thấy "## generating script" -> Cập nhật progress = 15%
+          │       - Thấy "## generating audio"  -> Cập nhật progress = 35%
+          │       - Thấy "## downloading materials" -> Cập nhật progress = 60%
+          │       - Thấy "## rendering final video" -> Cập nhật progress = 85%
+          │       - Ghi mỗi dòng log vào bảng `JobLog` trong Database PostgreSQL.
+          │
+          ├─► 5. CLI kết thúc với Exit Code 0:
+          │       - Chạy FFmpeg chụp ảnh thumbnail: `thumbnail.jpg`
+          │       - Upload final-1.mp4, thumbnail.jpg, subtitle.srt, script.json lên MinIO Storage.
+          │       - Tạo record mới trong bảng `Video`.
+          │       - Cập nhật GenerationJob -> status = "completed", progress = 100%.
+          │       - Xóa thư mục tạm local `engine/storage/tasks/{jobId}/`.
+          │
+          └─► 6. CLI thất bại (Exit Code != 0):
+                  - Catch exception, ghi log lỗi.
+                  - Cập nhật GenerationJob -> status = "failed", errorMessage = <stderr>.
+```
+
+### 3. Cơ chế Phục Hồi Lỗi Hệ Thống (Fault Tolerance & Error Recovery)
+* **Khởi động Database tự động:** Hàm `runDatabasePush()` trong `backend/src/main.ts` thực thi `npx prisma db push` với vòng lặp thử lại 10 lần (retries loop) để đảm bảo schema PostgreSQL luôn đồng bộ trước khi backend phục vụ request.
+* **Xử lý Job bị kẹt khi restart server (Stuck Jobs Recovery):** Hàm `recoverStuckJobs()` trong `backend/src/main.ts` quét toàn bộ các job có trạng thái `running` hoặc `queued` còn dở dang trước khi server sập/restart và tự động chuyển thành `failed` kèm thông báo lỗi rõ ràng.
+* **Fallback cào sản phẩm:** `ProductResearchService` thử thêm job vào BullMQ queue; nếu Redis bị mất kết nối, hệ thống tự động fallback sang cơ chế chạy bất đồng bộ inline (`executeResearchPipeline`).
+
+---
+
+## Phần G — Trace Các Luồng Xử Xý End-to-End (End-to-End Workflows)
+
+### Workflow 1: Luồng Tạo Video Từ Chủ Đề Đơn Thuần (Standard Topic-to-Video)
+```text
+[User] ──(1. Nhập Topic/Prompt)──► [Next.js Frontend]
+                                           │
+                                  (2. POST /api/ideas)
+                                           ▼
+                                 [NestJS IdeasController]
+                                           │
+                                  (3. Đẩy Job vào Queue)
+                                           ▼
+                                [BullMQ VideoProcessor]
+                                           │
+                           (4. Call CLI `engine/cli.py`)
+                                           ▼
+                                 [Python Task Service]
+                                           │
+               ┌───────────────────────────┼───────────────────────────┐
+               ▼                           ▼                           ▼
+       [Gemini Script AI]           [Edge-TTS Audio]           [Pexels Stock Clips]
+               │                           │                           │
+               └───────────────────────────┼───────────────────────────┘
+                                           ▼
+                              [MoviePy & FFmpeg Render]
+                                           │
+                                (5. Export final-1.mp4)
+                                           ▼
+                                [MinIO S3 Storage]
+                                           │
+                               (6. Video Record in DB)
+                                           ▼
+                                [Frontend Dashboard Play]
+```
+
+### Workflow 2: Luồng Tự Động Hóa Affiliate Video Sản Phẩm (Full Affiliate Automation Workflow)
+```text
+[User] ──(1. Dán Link Shopee/TikTok/Lazada)──► [Frontend Products Page]
+                                                         │
+                                           (2. POST /api/products/research)
+                                                         ▼
+                                          [ProductResearchModule]
+                                                         │
+                        ┌────────────────────────────────┴────────────────────────────────┐
+                        ▼                                                                 ▼
+             [Scraper Adapters]                                                [ProductAnalysisService]
+       (Trích xuất Giá, Ảnh, Title)                                            (Gemini phân tích USP & Angles)
+                        │                                                                 │
+                        └────────────────────────────────┬────────────────────────────────┘
+                                                         ▼
+                                            [Database: Product Record]
+                                                         │
+                                        (3. POST /content-ideas/generate)
+                                                         ▼
+                                             [ContentStrategyModule]
+                                       (Sinh 12 Dạng Ý Tưởng Bán Hàng)
+                                                         │
+                                        (4. POST /generate-script)
+                                                         ▼
+                                              [ScriptEngineModule]
+                                        (Tạo VideoScript Đa Phân Cảnh)
+                                                         │
+                                        (5. POST /generate-video)
+                                                         ▼
+                                            [BullMQ VideoProcessor]
+                                                         │
+                                    (6. Call CLI với `--product-data`)
+                                                         ▼
+                                           [Python Engine Task Service]
+                                                         │
+                     ┌───────────────────────────────────┼───────────────────────────────────┐
+                     ▼                                   ▼                                   ▼
+          [Affiliate Gemini Prompt]            [Product Visuals & Stock]               [Edge-TTS Audio & Sub]
+          (Hook 3s -> Problem ->               (Xử lý Ảnh sản phẩm 9:16 +             (Tạo giọng đọc tiếng Việt +
+           Solution -> CTA)                     Pexels Footage)                         Subtitle SRT)
+                     │                                   │                                   │
+                     └───────────────────────────────────┼───────────────────────────────────┘
+                                                         ▼
+                                            [MoviePy & FFmpeg Render]
+                                                         │
+                                              (7. Export Video MP4)
+                                                         ▼
+                                            [MinIO Object Storage]
+                                                         │
+                                        (8. POST /api/publishing/jobs)
+                                                         ▼
+                                              [PublishingModule]
+                                  (Đăng bài lên TikTok/YouTube/Reels/FB)
+                                                         │
+                                        (9. GET /api/analytics/overview)
+                                                         ▼
+                                               [AnalyticsModule]
+                                    (Theo dõi Views, Likes, Clicks, Sales)
 ```
 
 ---
 
-## Phần J — Configuration & Environment Variables
+## Phần H — AI Provider & LLM Architecture
 
-### 1. Các biến cấu hình chính trong `engine/config.toml`
-All configurations located at `engine/config.toml` (copy from `config.example.toml`):
-
-| Biến / Section | Vai trò | Đọc ở file | Bắt buộc? | API Free / Cloud? |
-| :--- | :--- | :--- | :--- | :--- |
-| `[app] llm_provider` | Chọn AI provider (`gemini`, `openai`, `aihubmix`,...) | `engine/app/services/llm.py` | Bắt buộc | Có (Gemini / Free Tier) |
-| `gemini_api_key` | Key gọi Google Gemini AI | `engine/app/services/llm.py` | Bắt buộc nếu dùng Gemini | Có (Miễn phí 15 RPM) |
-| `gemini_model_name` | Tên model (`gemini-2.5-flash`) | `engine/app/services/llm.py` | Optional | Miễn phí |
-| `pexels_api_keys` | Danh sách Key Pexels tải video B-roll | `engine/app/services/material.py` | Bắt buộc nếu dùng Pexels | Có (Free Key 200 req/hr) |
-| `pixabay_api_keys` | Key Pixabay tải B-roll | `engine/app/services/material.py` | Optional | Có (Free Key) |
-| `coverr_api_keys` | Key Coverr tải B-roll | `engine/app/services/material.py` | Optional | Có (Free Key) |
-| `edge_tts_timeout` | Timeout cho Edge-TTS (mặc định 30s) | `engine/app/services/voice.py` | Optional | Miễn phí hoàn toàn |
-| `ffmpeg_path` | Đường dẫn FFmpeg nếu không dùng mặc định | `engine/app/config/config.py` | Optional | N/A (Hệ thống) |
-
-### 2. Các biến môi trường của Backend (`backend/.env` hoặc `docker-compose.yml`)
-* `DATABASE_URL`: `postgresql://postgres:postgres@postgres:5432/videotool?schema=public`
-* `REDIS_HOST`: `redis` / `localhost`
-* `REDIS_PORT`: `6379`
-* `MINIO_ENDPOINT`: `minio` / `localhost`
-* `MINIO_ACCESS_KEY`: `minioadmin`
-* `MINIO_SECRET_KEY`: `minioadmin`
-* `MINIO_BUCKET_NAME`: `videos`
-* `PORT`: `23001` (Port backend API)
+* **Provider Mặc Định:** Google Gemini (`gemini-2.5-flash`).
+* **Các Provider Hỗ Trợ:** Gemini, OpenAI (GPT-4o-mini, GPT-4o), DeepSeek (v3/r1), Qwen, Ollama (local model), AIHubMix, AIML API.
+* **Vị trí cấu hình Key:** `engine/config.toml` (`gemini_api_key`) hoặc thiết lập biến môi trường `GEMINI_API_KEY`.
+* **Cơ chế Prompting:** Hệ thống tự động phân nhánh logic:
+  - Nếu tạo video chủ đề thông thường: Dùng `DEFAULT_SCRIPT_SYSTEM_PROMPT`.
+  - Nếu tạo video Affiliate sản phẩm (`product_data` tồn tại): Dùng `DEFAULT_AFFILIATE_SYSTEM_PROMPT` ép cấu trúc kịch bản theo công thức bán hàng chuyển đổi cao.
 
 ---
 
-## Phần K — Hướng Dẫn Chạy Repository Trên Linux Mint
+## Phần I — TTS Pipeline (Text-to-Speech)
 
-Dưới đây là hướng dẫn từng bước chuẩn xác dành cho máy **Linux Mint**.
+* **Provider Mặc Định:** Edge-TTS (`azure_tts_v1`).
+* **Ưu điểm:**
+  - **Miễn phí 100%**, không tốn chi phí API Key.
+  - Chạy hoàn toàn trên Cloud Microsoft Azure Edge WebSocket API.
+  - **Không tốn tài nguyên CPU/GPU local** để inference model.
+  - Hỗ trợ giọng đọc tiếng Việt mượt mà: `vi-VN-HoaiMyNeural` (Nữ), `vi-VN-NamMinhNeural` (Nam).
+* **Quản lý âm lượng & Tốc độ:** Điều chỉnh qua cờ CLI `--voice-rate` (tốc độ đọc) và `--voice-volume` (âm lượng).
 
-### Cách 1: Recommended — Chạy Bằng Docker Compose (Nhanh & Ổn định nhất)
+---
 
-#### Bước 1: Chuẩn bị file cấu hình
+## Phần J — Image / Video / Product Visual & Stock Media Pipeline
+
+* **Stock Media Cloud APIs:**
+  - **Pexels API:** API tìm kiếm video ngắn HD/4K (Hỗ trợ xoay vòng danh sách keys trong `pexels_api_keys`).
+  - **Pixabay API:** Backup tìm kiếm video & hình ảnh stock.
+  - **Coverr API:** Backup tìm kiếm B-roll.
+* **Product Visuals Pipeline & Ken Burns Motion Effects:**
+  - Khi người dùng tạo video cho Sản phẩm Affiliate, hàm `process_product_images()` trong `engine/app/services/material.py` lấy danh sách URL ảnh sản phẩm từ DB.
+  - Tải ảnh về, crop/pad thành khung hình 9:16 (1080x1920) chuẩn với background mờ hoặc màu chủ đạo.
+  - Áp dụng các hiệu ứng chuyển động ống kính tĩnh (**Ken Burns Effects**) bằng OpenCV & MoviePy:
+    - `zoom_in`: Phóng to dần vào trung tâm sản phẩm.
+    - `detail_zoom`: Zoom cận cảnh vào điểm nhấn tính năng.
+    - `pan_left` / `pan_right`: Quét ống kính ngang sang trái / phải.
+    - `pan_up`: Quét ống kính từ dưới lên trên.
+    - `zoom_out`: Thu nhỏ từ cận cảnh ra toàn cảnh.
+    - `subtle_float`: Hiệu ứng nổi nhẹ nhàng tạo cảm giác 3D.
+* **Quy Tắc Ưu Tiên Visual (Visual Priority Rules - `compose_visual_timeline`):**
+  - **Hook (Scene 1 - 3s đầu):** Bắt buộc sử dụng 100% clip chuyển động sản phẩm thực tế (P0 Product Visual) để thu hút chú ý.
+  - **CTA (Scene cuối):** Bắt buộc sử dụng clip sản phẩm ấn tượng nhất (P0 Hero Shot) kèm nút kêu gọi mua hàng.
+  - **Body (Thân video):** Duy trì từ 60% đến 80% thời lượng là hình ảnh/clip sản phẩm thực tế (P0), 20-40% còn lại là video stock minh họa (P1/P2) để giữ nhịp độ thị giác cuốn hút.
+
+---
+
+## Phần K — Subtitle Engine & Video Rendering Engine
+
+* **Subtitle Engine:**
+  - Lấy timestamp trực tiếp từ WebSocket stream của Edge-TTS `SubMaker`.
+  - Xuất file `.srt` chuẩn UTF-8.
+  - Hỗ trợ font tiếng Việt đẹp (`BeVietnamPro-Bold.ttf`).
+  - Cho phép tùy chỉnh cỡ chữ (`font_size`), màu chữ (`text_fore_color`), viền chữ (`stroke_color`, `stroke_width`), vị trí (`subtitle_position`: `top`, `center`, `bottom`, `custom`) và nền chữ bo tròn (`rounded_subtitle_background`).
+* **Rendering Engine:**
+  - **MoviePy 2.x:** Quản lý Timeline, trộn Audio tracks và Video tracks.
+  - **Pillow (PIL):** Render text phụ đề thành khung ảnh minh họa trước khi đưa vào MoviePy.
+  - **FFmpeg:** Đảm nhận công đoạn ghép nối thô (concat) và mã hóa video final chuẩn `libx264` (H.264), audio `aac`, 30 FPS, độ phân giải 1080x1920.
+
+---
+
+## Phần L — Multi-Platform Publishing & Analytics Engine
+
+### 1. Multi-Platform Publishing (`PublishingModule`)
+* **Tài khoản hỗ trợ (`PlatformAccount`):** `TIKTOK`, `YOUTUBE`, `INSTAGRAM`, `FACEBOOK`.
+* **Quy trình kết nối:** Hỗ trợ OAuth 2.0 Authorization Flow (`GET /api/publishing/accounts/:platform/connect`) để cấp quyền truy cập công khai.
+* **Lập lịch & Đăng bài (`PublishJob`):**
+  - Trạng thái Job: `DRAFT`, `SCHEDULED`, `QUEUED`, `PUBLISHING`, `PUBLISHED`, `FAILED`, `CANCELLED`.
+  - Đăng bài tự động theo thời gian hẹn giờ (`scheduledAt`).
+  - Tự động gắn Title, Description, Hashtags và Call-To-Action kèm Link Bio/Affiliate.
+  - Hỗ trợ đăng lại (`retryJob`) và hủy đăng (`cancelJob`).
+
+### 2. Post Analytics (`AnalyticsModule`)
+* **Bảng chỉ số (`PostAnalytics`):** Lịch sử lưu các đợt snapshot số liệu.
+* **Các chỉ số thu thập:**
+  - `views`: Tổng số lượt xem video.
+  - `likes`, `comments`, `shares`, `saves`: Các tương tác cơ bản.
+  - `clicks`: Lượt click vào link Affiliate sản phẩm.
+  - `watchTime` & `averageWatchTime`: Thời gian xem trung bình.
+  - `completionRate`: Tỷ lệ xem hết video (0-100%).
+  - `engagementRate`: Tỷ lệ tương tác tổng hợp `(likes + comments + shares) / views`.
+* **Trực quan hóa trên Dashboard:** `AnalyticsDashboard.tsx` hiển thị biểu đồ xu hướng, bảng xếp hạng Top Performing Posts và phân tích theo từng mạng xã hội.
+
+---
+
+## Phần M — Configuration, Environment Variables & Docker Architecture
+
+### 1. File Cấu Hình Python Engine (`engine/config.toml`)
+Tạo từ file mẫu `config.example.toml`:
+```toml
+[app]
+llm_provider = "gemini"
+gemini_api_key = "AIzaSyYOUR_ACTUAL_GEMINI_KEY"
+gemini_model_name = "gemini-2.5-flash"
+pexels_api_keys = ["YOUR_PEXELS_KEY_1", "YOUR_PEXELS_KEY_2"]
+subtitle_provider = "edge"
+
+[ui]
+font_name = "BeVietnamPro-Bold.ttf"
+voice_name = "vi-VN-HoaiMyNeural"
+```
+
+### 2. Các Biến Môi Trường Backend (`backend/.env` & Docker)
+* `DATABASE_URL`: `"postgresql://postgres:postgres@postgres:5432/videotool?schema=public"`
+* `REDIS_HOST`: `"redis"` / `"localhost"`
+* `REDIS_PORT`: `6379`
+* `MINIO_ENDPOINT`: `"minio"` / `"localhost"`
+* `MINIO_PORT`: `9000`
+* `MINIO_ACCESS_KEY`: `"minioadmin"`
+* `MINIO_SECRET_KEY`: `"minioadmin"`
+* `MINIO_BUCKET_NAME`: `"videos"`
+* `PORT`: `23001`
+* `CORS_ORIGIN`: `"http://localhost:23000"`
+
+### 3. Docker Compose Architecture (`docker-compose.yml`)
+Khởi chạy đồng bộ 5 containers:
+1. `videotool-postgres`: Container PostgreSQL 15-alpine (Port `25432:5432`).
+2. `videotool-redis`: Container Redis 7-alpine (Port `26379:6379`).
+3. `videotool-minio`: Container MinIO Object Storage (Port `29000:9000`, Console `29001:9001`).
+4. `videotool-backend`: Container NestJS API Server (Port `23001:23001`).
+5. `videotool-frontend`: Container Next.js Web Dashboard (Port `23000:23000`).
+
+---
+
+## Phần N — Hướng Dẫn Chạy & Vận Hành Hệ Thống Trên Linux Mint
+
+### Phương Pháp 1: Recommended — Khởi Chạy Bằng Docker Compose (Đơn Giản Nhất)
+
+#### Bước 1: Chuẩn bị cấu hình Engine
 ```bash
 cd short-video
 cp engine/config.example.toml engine/config.toml
 ```
 
-#### Bước 2: Điền API Key vào `engine/config.toml`
-Mở `engine/config.toml` và sửa:
+#### Bước 2: Điền API Keys vào `engine/config.toml`
+Mở `engine/config.toml` bằng text editor và cập nhật:
 ```toml
 [app]
 llm_provider = "gemini"
@@ -537,289 +791,99 @@ gemini_api_key = "AIzaSyYOUR_ACTUAL_GEMINI_KEY"
 pexels_api_keys = ["YOUR_ACTUAL_PEXELS_KEY"]
 ```
 
-#### Bước 3: Khởi chạy Docker Compose
+#### Bước 3: Khởi chạy Full-stack Container
 ```bash
 docker compose up -d
 ```
 
-#### Bước 4: Mở trình duyệt
-* **Frontend UI Dashboard:** http://localhost:23000
-* **Backend API Docs (Swagger):** http://localhost:23001/api
-* **MinIO Console (Storage):** http://localhost:29001 (User: `minioadmin` / Pass: `minioadmin`)
+#### Bước 4: Truy cập các địa chỉ ứng dụng
+* **Frontend Web Dashboard:** `http://localhost:23000`
+* **Backend NestJS API:** `http://localhost:23001/api`
+* **MinIO Storage Console:** `http://localhost:29001` (User: `minioadmin` / Pass: `minioadmin`)
 
 ---
 
-### Cách 2: Manual — Chạy Trực Tiếp Local (Không qua Docker containers)
+### Phương Pháp 2: Manual — Chạy Trực Tiếp Local (Không dùng Docker Containers)
 
-Nếu máy bạn ít RAM và muốn chạy trực tiếp không qua Docker:
+#### Bước 1: Cài đặt công cụ nền tảng trên Linux Mint
+```bash
+sudo apt update
+sudo apt install -y ffmpeg git postgresql redis-server
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
-#### Yêu cầu cài trước trên Linux Mint:
-* Python 3.11 & `uv` package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-* Node.js v20+ & `pnpm` hoặc `npm`
-* FFmpeg (`sudo apt install ffmpeg`)
-* PostgreSQL 15 & Redis server
-
-#### Bước 1: Cài đặt dependencies cho Python Engine
+#### Bước 2: Setup Python Engine
 ```bash
 cd short-video/engine
 uv sync --frozen
 cp config.example.toml config.toml
-# Sửa gemini_api_key và pexels_api_keys trong config.toml
+# Điền gemini_api_key và pexels_api_keys vào config.toml
 ```
 
-#### Bước 2: Cài đặt & Migrate Database cho Backend
+#### Bước 3: Setup Backend NestJS Database & Dependencies
 ```bash
 cd ../backend
 npm install
-# Đảm bảo PostgreSQL đang chạy và DATABASE_URL đúng trong file .env
+# Tạo database videotool trong Postgres local và sửa DATABASE_URL trong .env nếu cần
 npx prisma db push
 ```
 
-#### Bước 3: Cài đặt Frontend
+#### Bước 4: Setup Frontend Next.js
 ```bash
 cd ../frontend
 npm install
 ```
 
-#### Bước 4: Chạy các dịch vụ (Mở 3 terminal riêng)
+#### Bước 5: Khởi chạy Dịch vụ (Mở 3 Terminal)
 * **Terminal 1 (Backend API):**
   ```bash
   cd backend && npm run start:dev
   ```
-* **Terminal 2 (Frontend UI):**
+* **Terminal 2 (Frontend Dashboard):**
   ```bash
   cd frontend && npm run dev
   ```
-* **Terminal 3 (Test thử Python CLI trực tiếp không qua Web):**
+* **Terminal 3 (Test thử Python CLI độc lập):**
   ```bash
   cd engine
-  uv run python cli.py --video-subject "Top 3 đồ gia dụng thông minh" --video-aspect 9:16
+  uv run python cli.py --video-subject "Nồi chiên không dầu Lock&Lock" --video-aspect 9:16
   ```
 
 ---
 
-## Phần L — Ma Trận Tính Năng Hiện Tại (Feature Matrix)
+## Phần O — Ma Trận Tính Năng Thực Tế Trong Codebase (Feature Matrix)
 
-| Feature | Đã có? | File / Location | Có cần sửa để làm Affiliate? |
+| Feature / Module | Trạng thái Code | Vị trí Source Code thực tế | Ghi chú & Đánh giá |
 | :--- | :---: | :--- | :--- |
-| **AI Script Generation** | **ĐÃ CÓ** | `engine/app/services/llm.py` -> `generate_script()` | **Nên sửa Prompt** để tối ưu bài bán hàng |
-| **Google Gemini Support** | **ĐÃ CÓ** | `engine/app/services/llm.py` (Provider `gemini`) | Không cần sửa (chỉ cấu hình Key) |
-| **Cloud TTS (Free)** | **ĐÃ CÓ** | `engine/app/services/voice.py` -> `azure_tts_v1()` (Edge-TTS) | Không cần sửa (Đã có giọng Việt) |
-| **Stock Video Search** | **ĐÃ CÓ** | `engine/app/services/material.py` -> `search_videos_pexels()` | **Nên sửa** để hỗ trợ tải ảnh sản phẩm thực tế |
-| **Custom Local Material** | **ĐÃ CÓ** | `engine/app/services/task.py` -> `get_video_materials()` | Giữ nguyên |
-| **Subtitle Burn-in** | **ĐÃ CÓ** | `engine/app/services/video.py` -> `generate_video()` | **Có thể sửa** nếu muốn animation TikTok kiểu mới |
-| **Video Format 9:16** | **ĐÃ CÓ** | `engine/app/services/video.py` (`VideoAspect.portrait`) | Giữ nguyên |
-| **Batch Generation** | **ĐÃ CÓ** | `backend/src/modules/ideas/ideas.service.ts` & `cli.py` | Giữ nguyên / Mở rộng |
-| **REST API Server** | **ĐÃ CÓ** | `backend/src/main.ts` & `engine/main.py` | Giữ nguyên |
-| **Web UI Dashboard** | **ĐÃ CÓ** | `frontend/src/app/dashboard/page.tsx` | **Nên sửa** để thêm tab Quản lý Sản phẩm |
-| **Database Storage** | **ĐÃ CÓ** | `backend/prisma/schema.prisma` (PostgreSQL + Prisma) | **Cần sửa** để thêm bảng Product/Affiliate |
-| **Export MP4 Video** | **ĐÃ CÓ** | `backend/src/modules/queue/video.processor.ts` -> MinIO | Giữ nguyên |
-| **Product Link Parser** | **CHƯA CÓ**| N/A | **CẦN THÊM MỚI (P0)** |
-| **Affiliate Link Manager**| **CHƯA CÓ**| N/A | **CẦN THÊM MỚI (P0)** |
-| **Product Research Agent**| **CHƯA CÓ**| N/A | **CẦN THÊM MỚI (P0)** |
+| **AI Script Generation** | **ĐÃ HOÀN THÀNH** | `engine/app/services/llm.py` | Sinh kịch bản bằng Gemini / OpenAI |
+| **Google Gemini 2.5 Flash** | **ĐÃ HOÀN THÀNH** | `engine/app/services/llm.py` | Provider `gemini` hỗ trợ đầy đủ |
+| **Cloud TTS (Free Edge-TTS)**| **ĐÃ HOÀN THÀNH** | `engine/app/services/voice.py` | Dùng Edge-TTS giọng đọc Việt chuẩn |
+| **Stock Video Search** | **ĐÃ HOÀN THÀNH** | `engine/app/services/material.py` | Pexels / Pixabay / Coverr API |
+| **Subtitle Burn-in** | **ĐÃ HOÀN THÀNH** | `engine/app/services/video.py` | Render phụ đề tiếng Việt với PIL |
+| **Video Format 9:16 & 16:9** | **ĐÃ HOÀN THÀNH** | `engine/app/services/video.py` | Tự động crop & resize 1080x1920 |
+| **Product Scraper / Crawler**| **ĐÃ HOÀN THÀNH** | `backend/src/modules/product-research/adapters/` | Adapter Shopee, Lazada, TikTok, Amazon, Generic |
+| **Product AI Research** | **ĐÃ HOÀN THÀNH** | `backend/src/modules/product-research/product-analysis.service.ts` | Phân tích USP, Pain Points, Angles |
+| **Product Content Brief** | **ĐÃ HOÀN THÀNH** | `backend/src/modules/product-research/content-brief.service.ts` | Sinh brief bán hàng tái sử dụng |
+| **Content Strategy Generator**| **ĐÃ HOÀN THÀNH** | `backend/src/modules/content-strategy/` | Sinh 12 dạng ý tưởng bán hàng |
+| **Multi-Scene Script Engine** | **ĐÃ HOÀN THÀNH** | `backend/src/modules/script-engine/` | Kịch bản phân cảnh Hook -> Story -> CTA |
+| **Product Visuals 9:16** | **ĐÃ HOÀN THÀNH** | `engine/app/services/material.py` (`process_product_images`) | Biến ảnh SP thành clip 9:16 động |
+| **Affiliate Prompting** | **ĐÃ HOÀN THÀNH** | `engine/app/services/llm.py` (`DEFAULT_AFFILIATE_SYSTEM_PROMPT`) | Prompt bán hàng chuyển đổi cao |
+| **Task Queue & BullMQ** | **ĐÃ HOÀN THÀNH** | `backend/src/modules/queue/video.processor.ts` | 3 Queues với Redis Worker |
+| **Multi-Platform Publishing** | **ĐÃ HOÀN THÀNH** | `backend/src/modules/publishing/` | Đăng video TikTok, YouTube, Instagram, FB |
+| **Post Analytics Collection** | **ĐÃ HOÀN THÀNH** | `backend/src/modules/analytics/` | Đếm views, likes, comments, clicks, engagement |
+| **Web UI Management** | **ĐÃ HOÀN THÀNH** | `frontend/src/app/` & `frontend/src/components/` | Dashboard, Products, Publishing, Analytics UI |
 
 ---
 
-## Phần M — Phân Tích Khoảng Cách (Gap Analysis): Hệ Thống Affiliate Còn Thiếu Gì?
+## Phần P — Các Sơ Đồ Kiến Trúc & Luồng Dữ Liệu (Diagrams)
 
-So sánh giữa **Codebase Hiện Tại** và **Hệ Thống Affiliate Mục Tiêu**:
-
-```text
-CURRENT REPOSITORY (MoneyPrinterTurbo)           MY TARGET AFFILIATE SYSTEM
-Topic / General Prompt                             Product Link / Affiliate Link
-       ↓                                                  ↓
-AI Script (Chủ đề chung chung)                     Product Scraping & Feature Extraction
-       ↓                                                  ↓
-Stock Media (Pexels / Pixabay)                     Marketing Angle + Hook 3s + Product Script
-       ↓                                                  ↓
-TTS Audio & Subtitle                               Product Images/Videos + Voiceover
-       ↓                                                  ↓
-Render MP4                                         Render Video với Price Badge & Affiliate CTA
-```
-
-### Phân loại mức độ ưu tiên tính năng cần làm:
-
-#### P0 — Bắt buộc phải làm (để có MVP Affiliate Video Automation)
-1. **Product Input & Storage:** Thêm bảng `Product` trong Database lưu `title`, `productUrl`, `affiliateUrl`, `price`, `images`.
-2. **Product Research Module:** Module cào/thu thập dữ liệu thông số, điểm nổi bật của sản phẩm từ URL.
-3. **Marketing Angle & Script Prompt Customization:** Tùy biến Prompt trong `llm.py` để Gemini tạo kịch bản theo công thức bán hàng (Hook 3s -> Pain Point -> Solution -> Product USP -> Call to Action kèm Link Affiliate).
-4. **Product Media Integration:** Cho phép đưa hình ảnh sản phẩm vào luồng render video thay vì 100% video B-roll từ Pexels.
-
-#### P1 — Quan trọng (Làm sau khi MVP hoạt động)
-1. **Affiliate Overlay Template:** Đè Call-To-Action (ví dụ: "Link mua sản phẩm ở tiểu sử / comment") và Bảng giá lên video.
-2. **Batch Product Generation:** Chọn 5 sản phẩm -> Tự động sinh 5 video hàng loạt.
-3. **Quản lý Template Video:** Tùy chọn tone giọng, nhạc nền hot trend theo từng ngách sản phẩm.
-
-#### P2 — Nâng cao (Có thể làm sau)
-1. **Auto Posting:** Tự động đăng video lên TikTok / Shorts / Reels qua API.
-2. **A/B Testing Kịch bản:** Sinh 3 phiên bản Hook khác nhau cho cùng 1 sản phẩm.
-3. **Thống kê Click Affiliate & Doanh thu.**
-
----
-
-## Phần N — Kiến Trúc Hệ Thống Mục Tiêu (Affiliate Video Automation)
-
-Hệ thống mục tiêu tận dụng **100% kiến trúc 3 lớp hiện tại** của repository, chỉ mở rộng thêm Service Layer cho Affiliate:
-
-```text
-                        AFFILIATE AUTOMATION SYSTEM
-
-                          User (Web UI Frontend)
-                                   │
-                                   ▼
-                       [Product Manager Module]
-                       (Nhập Link Shopee/TikTok)
-                                   │
-                                   ▼
-                       [Product Research Service]
-                     (Phân tích USP, Giá, Ảnh SP)
-                                   │
-                                   ▼
-                        [Database: PostgreSQL]
-                       (Lưu Product & Affiliate)
-                                   │
-                                   ▼
-                       [AI Marketing Agent (Gemini)]
-                (Sinh Hook 3s + Kịch bản Affiliate Sales)
-                                   │
-                                   ▼
-            ┌──────────────────────┴──────────────────────┐
-            ▼                                             ▼
-  [Product Media Merger]                           [Edge-TTS Engine]
-(Biến ảnh SP + Pexels B-roll                       (Tạo giọng đọc
- thành video clips 9:16)                           tiếng Việt chuẩn)
-            │                                             │
-            └──────────────────────┬──────────────────────┘
-                                   ▼
-                       [Core Video Engine (MoviePy)]
-                   (Ghép clip + Burn Subtitle + CTA Badge)
-                                   │
-                                   ▼
-                        [MinIO Storage / Export]
-                                   │
-                                   ▼
-                           [Preview & Publish]
-```
-
----
-
-## Phần O — Tôi Cần Sửa Code Ở Đâu? (Exact Code Modification Mapping)
-
-Đây là bảng tra cứu chính xác từng file và hàm bạn cần đụng tới khi tùy biến:
-
-| Mục tiêu Customization | File hiện tại cần sửa | Function / Class liên quan | Hướng biến đổi code |
-| :--- | :--- | :--- | :--- |
-| **1. Nhập sản phẩm & Link Affiliate** | `backend/prisma/schema.prisma`<br>`backend/src/modules/ideas/` | Model `Idea`<br>`IdeasService.create()` | Thêm model `Product` vào Prisma schema và thêm API endpoint nhận `productUrl`, `affiliateUrl`. |
-| **2. AI Sinh Kịch bản bán hàng (Affiliate Script)** | `engine/app/services/llm.py` | `DEFAULT_SCRIPT_SYSTEM_PROMPT`<br>`generate_script()` | Thay đổi System Prompt thành cấu trúc kịch bản bán hàng (Hook 3s -> Problem -> Product Solution -> CTA). |
-| **3. Thêm Hình ảnh Sản phẩm vào Video** | `engine/app/services/material.py`<br>`engine/app/services/video.py` | `download_videos()`<br>`preprocess_video()` | Thêm logic chuyển danh sách URL hình ảnh sản phẩm thành các video clip ngắn (dùng MoviePy `ImageClip` với hiệu ứng Zoom-in). |
-| **4. Thay đổi Giọng đọc / Ngôn ngữ TTS** | `engine/app/services/voice.py` | `parse_voice_name()` | Đổi voice mặc định thành giọng đọc bán hàng tiếng Việt phù hợp (`vi-VN-HoaiMyNeural` hoặc `vi-VN-NamMinhNeural`). |
-| **5. Thêm Overlay Sticker / Khung Bán Hàng** | `engine/app/services/video.py` | `generate_video()` | Thêm lớp `ImageClip` đè Sticker "Mua ngay tại Link Bio" hoặc khung giá tiền vào vị trí góc dưới video. |
-| **6. Giao diện Web UI Nhập Sản Phẩm** | `frontend/src/app/ideas/page.tsx` | Form React Component | Thêm ô nhập Link sản phẩm & Link Affiliate thay vì chỉ nhập Topic chung chung. |
-
----
-
-## Phần P — Những Phần TUYỆT ĐỐI KHÔNG Nên Sửa
-
-Để đảm bảo hệ thống hoạt động ổn định và **tối thiểu hóa khối lượng sửa code**, bạn **GHI NHỚ NÊN GIỮ NGUYÊN** các module sau:
-
-1. **`backend/src/modules/queue/video.processor.ts` (BullMQ Worker):** Cơ chế quản lý queue, spawn CLI process và đọc log real-time đã hoạt động rất chuẩn xác.
-2. **`backend/src/modules/storage/storage.service.ts` (MinIO S3 Client):** Logic upload file MP4, thumbnail, subtitle lên MinIO không cần thay đổi.
-3. **`engine/app/services/video.py` -> `combine_videos()`:** Hàm ghép nối video thô theo tỉ lệ 9:16 và căn độ dài audio đã được tối ưu rất tốt.
-4. **`engine/app/services/voice.py` -> `azure_tts_v1()` (Edge-TTS wrapper):** Giữ nguyên vì đây là dịch vụ TTS Cloud miễn phí tuyệt vời nhất cho tiếng Việt.
-5. **Cấu trúc trừu tượng Provider LLM (`engine/app/services/llm.py`):** Chỉ sửa Prompt, không sửa cấu trúc gọi SDK Gemini.
-
----
-
-## Phần Q — Đề Xuất Roadmap Implementation (Phase 0 đến Phase 10)
-
-```text
-Phase 0: Hiểu và Chạy thử Dự Án Hiện Tại
-  └─ Cấu hình `config.toml` với Gemini Key & Pexels Key.
-  └─ Chạy thử `docker compose up` hoặc chạy CLI sinh 1 video đầu tiên thành công.
-
-Phase 1: Tùy Chỉnh Prompt Kịch Bản Bán Hàng (Affiliate Prompting)
-  └─ Sửa `DEFAULT_SCRIPT_SYSTEM_PROMPT` trong `engine/app/services/llm.py`.
-  └─ Test sinh kịch bản cho 1 sản phẩm cụ thể (ví dụ: "Nồi chiên không dầu").
-
-Phase 2: Mở Rộng Schema Database Sản Phẩm
-  └─ Thêm model `Product` vào `backend/prisma/schema.prisma`.
-  └─ Chạy `npx prisma db push` để update PostgreSQL.
-
-Phase 3: Xây Dựng Feature Thu Thập Thông Tin Sản Phẩm (Product Research)
-  └─ Tạo module trong Backend hoặc Python Engine để cào thông tin tiêu đề, giá, hình ảnh từ Link sản phẩm.
-
-Phase 4: Tích Hợp Media Sản Phẩm Vào Video Engine
-  └─ Cập nhật `engine/app/services/material.py` để xử lý danh sách URL hình ảnh sản phẩm.
-  └─ Dùng MoviePy biến ảnh sản phẩm thành video clip ngắn 9:16.
-
-Phase 5: Thêm Overlay Call-To-Action (CTA) & Sticker Bán Hàng
-  └─ Cập nhật `engine/app/services/video.py` hàm `generate_video()` đè logo/text "Link mua hàng ở Bio".
-
-Phase 6: Tùy Chỉnh Frontend Dashboard Cho Affiliate
-  └─ Sửa giao diện `frontend/src/app/ideas/page.tsx` thành màn hình "Thêm Sản Phẩm Affiliate".
-
-Phase 7: Kiểm Thử Tạo Video Hàng Loạt (Batch Generation)
-  └─ Chạy thử tạo 5-10 video cho 5 sản phẩm khác nhau.
-
-Phase 8: Tự Động Hóa & Tối Ưu Hóa Render
-  └─ Đánh giá tốc độ render trên Linux Mint và tinh chỉnh số luồng (`n_threads`).
-
-Phase 9: Tích Hợp Đăng Tự Động (Auto Publishing - Optional)
-  └─ Tích hợp TikTok Open API / YouTube Data API nếu có nhu cầu tự đăng.
-
-Phase 10: Phân Tích Hiệu Quả & Đo Lường (Analytics - Optional)
-  └─ Quản lý lượt view và click link affiliate.
-```
-
----
-
-## Phần R — Giải Thích Cho Người Không Biết Codebase / Không Rành Python
-
-Nếu bạn là một Developer chưa quen làm việc với Python và codebase này, hãy nhớ **Tư duy Mô hình 3 Bước Simple**:
-
-```text
-[Input: Dữ liệu đầu vào] ──► [Processing: Xử lý] ──► [Output: Dữ liệu đầu ra]
-```
-
-Dưới đây là bảng giải thích ngắn gọn 5 hàm quan trọng nhất trong toàn bộ dự án theo tư duy này:
-
-### 1. Hàm `generate_script()` (`engine/app/services/llm.py`)
-* **Input:** Tên sản phẩm / Chủ đề (Ví dụ: `"Nồi chiên không dầu Philips"`).
-* **Xử lý:** Gửi prompt sang Google Gemini API -> Nhận văn bản trả về -> Xóa bỏ ký tự thừa.
-* **Output:** Chuỗi văn bản kịch bản 3-4 đoạn (Ví dụ: `"Bạn bận rộn nhưng vẫn muốn ăn ngon? Nồi chiên Philips chính là giải pháp..."`).
-
-### 2. Hàm `tts()` (`engine/app/services/voice.py`)
-* **Input:** Văn bản kịch bản từ bước 1 + Tên giọng đọc (Ví dụ: `"vi-VN-HoaiMyNeural"`).
-* **Xử lý:** Kết nối WebSocket tới Microsoft Edge TTS Server -> Tải luồng audio về.
-* **Output:** File âm thanh `audio.mp3` + Cấu trúc thời gian từng từ (`SubMaker`).
-
-### 3. Hàm `search_videos_pexels()` (`engine/app/services/material.py`)
-* **Input:** Từ khóa tiếng Anh (Ví dụ: `"cooking, kitchen"`) + Tỉ lệ khung hình (`9:16`).
-* **Xử lý:** Gọi HTTP GET sang REST API của Pexels -> Lọc lấy danh sách link video HD dọc.
-* **Output:** Mảng các đường link video `.mp4` bản quyền miễn phí.
-
-### 4. Hàm `combine_videos()` (`engine/app/services/video.py`)
-* **Input:** Danh sách các file video stock đã tải + File `audio.mp3`.
-* **Xử lý:** Cắt ngẫu nhiên từng clip video stock thành đoạn 2-4 giây -> Crop thành khổ 1080x1920 -> Nối lại cho đến khi độ dài video đúng bằng độ dài file `audio.mp3`.
-* **Output:** File video hình ảnh tạm `combined-1.mp4`.
-
-### 5. Hàm `generate_video()` (`engine/app/services/video.py`)
-* **Input:** Video hình `combined-1.mp4` + File tiếng `audio.mp3` + File phụ đề `subtitle.srt` + Nhạc nền BGM.
-* **Xử lý:** Dùng MoviePy trộn âm thanh kịch bản và nhạc nền (nhạc nền giảm volume xuống 15%) -> Dùng Pillow vẽ chữ phụ đề tiếng Việt đè lên video -> Export.
-* **Output:** File video hoàn chỉnh `final-1.mp4`.
-
----
-
-## Phần S — Các Sơ Đồ Kiến Trúc & Luồng Dữ Liệu (Diagrams)
-
-### 1. Kiến trúc phụ thuộc hệ thống (Architecture & Dependency Diagram)
-
+### 1. Kiến Trúc Phụ Thuộc Hệ Thống Tổng Thể
 ```text
 +-----------------------------------------------------------------------+
 |                         FRONTEND (Next.js 15)                         |
 |                    http://localhost:23000 (React UI)                  |
 +-----------------------------------┬-----------------------------------+
-                                    | REST API Calls (`/api/ideas`, `/api/jobs`)
+                                    | REST API Calls (`/api/...`)
                                     ▼
 +-----------------------------------------------------------------------+
 |                         BACKEND (NestJS API)                          |
@@ -832,7 +896,7 @@ Dưới đây là bảng giải thích ngắn gọn 5 hàm quan trọng nhất t
                 ▼                                 ▼
     +───────────────────────+        +──────────────────────────────────+
     | PostgreSQL Database   |        |  Redis Server (Port 6379)        |
-    | (Store Ideas & Jobs)  |        +----------------─┬────────────────+
+    | (11 Schema Models)    |        +----------------─┬────────────────+
     +───────────────────────+                          │
                                                        │ Process Queue
                                                        ▼
@@ -849,8 +913,8 @@ Dưới đây là bảng giải thích ngắn gọn 5 hàm quan trọng nhất t
 |                           `engine/cli.py`                             |
 |                                                                       |
 |  +-------------------+  +-------------------+  +-------------------+  |
-|  | Google Gemini AI  |  |   Edge TTS Cloud  |  |   Pexels Stock    |  |
-|  |  (Script & Terms) |  |   (Voice Audio)   |  |   (Footage B-roll)|  |
+|  | Google Gemini AI  |  |   Edge TTS Cloud  |  |  Product Visuals  |  |
+|  | (Script & Terms)  |  |   (Voice Audio)   |  |  & Pexels Stock   |  |
 |  +─────────┬─────────+  +─────────┬─────────+  +─────────┬─────────+  |
 |            │                      │                      │            |
 |            └──────────────────────┼──────────────────────┘            |
@@ -869,118 +933,40 @@ Dưới đây là bảng giải thích ngắn gọn 5 hàm quan trọng nhất t
 
 ---
 
-### 2. Sơ đồ xử lý Video (Video Generation Pipeline Diagram)
-
-```text
-[Subject / Product Topic]
-          │
-          ▼
-[Gemini 2.5 Flash API] ──► Generates Script Text (Văn bản)
-          │
-          ├───────────────────────────────┐
-          ▼                               ▼
-[Gemini Extract Terms]          [Edge TTS Service]
-(Từ khóa Pexels B-roll)          (Tạo audio.mp3 & SubMaker)
-          │                               │
-          ▼                               ▼
-[Pexels / Pixabay API]          [Subtitle Generator]
-(Download clip .mp4)             (Xuất file subtitle.srt)
-          │                               │
-          └───────────────┬───────────────┘
-                          ▼
-            [MoviePy Video Concatenator]
-            (Crop 9:16 & Concat -> combined.mp4)
-                          │
-                          ▼
-            [Final MoviePy Synthesizer]
-            (Combine Audio + Video + Subtitle + BGM)
-                          │
-                          ▼
-                  [FFmpeg libx264]
-                          │
-                          ▼
-                 Output: `final-1.mp4`
-```
-
----
-
-## Phần T — Trả Lời Trực Tiếp 10 Câu Hỏi Cốt Lõi
+## Phần Q — Trả Lời Trực Tiếp Các Câu Hỏi Cốt Lõi Về Codebase
 
 #### 1. Repository này thực sự làm được gì?
-> **Trả lời:** Tự động tạo hoàn chỉnh 1 video ngắn 9:16 (hoặc 16:9) từ chủ đề/văn bản. Tự động viết kịch bản bằng AI, tạo giọng đọc phát âm chuẩn, tìm video minh họa bản quyền miễn phí, làm phụ đề chữ và đè nhạc nền để xuất file `.mp4`.
+> **Trả lời:** Đây là một hệ thống Full-stack hoàn chỉnh giúp tự động hóa toàn bộ quy trình Affiliate Video Marketing: Từ cào dữ liệu sản phẩm (Shopee/Lazada/TikTok/Amazon) -> Dùng AI phân tích USP & lập chiến lược nội dung -> Sinh kịch bản phân cảnh -> Tạo giọng đọc TTS & phụ đề -> Xử lý hình ảnh sản phẩm & ghép video stock -> Export file `.mp4` -> Đăng bài đa nền tảng (TikTok, YouTube, Instagram, Facebook) -> Thu thập báo cáo Analytics.
 
-#### 2. Nó dùng architecture gì?
-> **Trả lời:** Kiến trúc Full-stack Doanh nghiệp 3 Lớp (Three-tier Enterprise Architecture): **Next.js (Frontend UI)** -> **NestJS + PostgreSQL + Redis/BullMQ Queue (Backend Service & Storage Management)** -> **Python Engine (Core Video Generation Engine)**.
+#### 2. Kiến trúc thực tế trong code là gì?
+> **Trả lời:** Kiến trúc Doanh nghiệp 3 Lớp (Three-tier Architecture): **Next.js 15 (Frontend)** ➔ **NestJS 10 + PostgreSQL + Redis/BullMQ + MinIO (Backend Service & Task Queue)** ➔ **Python 3.11 (Core Video Engine)**.
 
-#### 3. Entry point nằm ở đâu?
-> * **Backend API:** `backend/src/main.ts` (Port 23001).
+#### 3. Entry points chính nằm ở đâu?
+> * **Backend NestJS API:** `backend/src/main.ts` (Port 23001).
 > * **Frontend Dashboard:** `frontend/src/app/page.tsx` -> `/dashboard` (Port 23000).
-> * **Python Engine CLI:** `engine/cli.py` (Được backend kích hoạt).
-> * **Python Standalone Engine (FastAPI):** `engine/main.py` (Port 8080).
+> * **Python Engine CLI:** `engine/cli.py` (Được BullMQ worker kích hoạt).
+> * **Python FastAPI Server:** `engine/main.py` (Port 8080).
 
-#### 4. Flow tạo video hiện tại như thế nào?
-> **Trả lời:** User nhập chủ đề ở Frontend -> NestJS lưu Job vào PostgreSQL & đẩy vào BullMQ Queue -> Worker gọi `engine/cli.py` -> Python dùng Gemini viết kịch bản -> Gọi Edge-TTS tạo tiếng & phụ đề -> Tải clip B-roll từ Pexels -> Dùng MoviePy & FFmpeg ghép nối thành MP4 -> Worker upload file lên MinIO và hoàn tất.
+#### 4. Flow tạo video diễn ra như thế nào?
+> **Trả lời:** User gửi request ➔ NestJS ghi Job vào PostgreSQL & đẩy vào BullMQ Queue ➔ Worker gọi CLI `engine/cli.py` ➔ Engine gọi Gemini viết kịch bản ➔ Gọi Edge-TTS sinh tiếng & phụ đề ➔ Tải clip stock Pexels hoặc biến ảnh sản phẩm thành clip 9:16 ➔ MoviePy & FFmpeg ghép nối thành MP4 ➔ Worker upload MinIO, cập nhật DB và phát lên UI Dashboard.
 
-#### 5. AI nào đang được sử dụng?
-> **Trả lời:** Mặc định hỗ trợ **Google Gemini API** (`gemini-2.5-flash`), OpenAI GPT-4o-mini, DeepSeek, Qwen, cùng các cổng chuyển tiếp AIHubMix/AIML API.
+#### 5. AI LLM nào đang được sử dụng?
+> **Trả lời:** Mặc định sử dụng **Google Gemini API** (`gemini-2.5-flash`). Hệ thống cũng hỗ trợ OpenAI, DeepSeek, Qwen, Ollama local.
 
-#### 6. Những phần nào chạy local?
-> **Trả lời:** NestJS Server, Next.js Server, PostgreSQL Database, Redis Queue, MinIO Storage, và lệnh FFmpeg Render Video final.
+#### 6. Những phần nào chạy local và phần nào gọi Cloud API?
+> * **Chạy Local:** NestJS API Server, Next.js Frontend, PostgreSQL Database, Redis Queue, MinIO Storage, Scraper Adapters, và FFmpeg Video Renderer.
+> * **Gọi Cloud API:** Sinh văn bản AI (Google Gemini), Giọng đọc TTS (Microsoft Edge-TTS Cloud WebSocket), Video Stock (Pexels API), Đăng bài đa nền tảng (TikTok, YouTube, Instagram, Facebook APIs).
 
-#### 7. Những phần nào gọi cloud API?
-> **Trả lời:** Sinh văn bản AI (Google Gemini API), Sinh giọng đọc TTS (Edge-TTS Microsoft Cloud), và Tìm kiếm/Tải clip B-roll (Pexels / Pixabay Cloud API).
-
-#### 8. Máy Linux yếu của tôi có thể chạy được không?
-> **Trả lời:** **CHẠY TỐT 100%.** Vì toàn bộ các tác vụ nặng về trí tuệ nhân tạo và xử lý âm thanh đều đẩy lên Cloud API miễn phí, máy local của bạn chỉ tốn một chút RAM (dưới 2GB) và CPU để chạy FFmpeg mã hóa file video cuối cùng.
-
-#### 9. Tôi cần implement thêm những gì để thành hệ thống affiliate?
-> **Trả lời:** Cần làm thêm 4 thành phần: (1) Bảng lưu dữ liệu Sản phẩm & Link Affiliate trong DB, (2) Module cào/nhập thông số sản phẩm, (3) Điều chỉnh Prompt kịch bản Gemini thành cấu trúc bán hàng (Hook 3s -> Problem -> Solution -> CTA), và (4) Đưa hình ảnh sản phẩm thực tế vào luồng ghép video.
-
-#### 10. Nếu bắt đầu custom ngay bây giờ, 3 file/module đầu tiên tôi nên đọc là gì và tại sao?
-> **1. `engine/app/services/llm.py`:** Để đọc và thay đổi Prompt kịch bản (`DEFAULT_SCRIPT_SYSTEM_PROMPT`) thành kịch bản Affiliate bán hàng.  
-> **2. `engine/app/services/task.py`:** Để nắm trọn vẹn luồng điều phối 6 bước tạo video và biết nơi chèn logic tải ảnh sản phẩm.  
-> **3. `backend/prisma/schema.prisma`:** Để hiểu cấu trúc lưu trữ hiện tại và sẵn sàng mở rộng bảng `Product` lưu thông tin link affiliate.
+#### 7. Máy Linux yếu (như Linux Mint CPU 4 nhân, 8GB RAM) có chạy được không?
+> **Trả lời:** **CHẠY RẤT MƯỢT.** Tất cả công đoạn AI và TTS nặng nhất đều được đẩy lên Cloud API miễn phí. Máy local chỉ tốn CPU ở bước FFmpeg encode video MP4 cuối cùng (tốn khoảng 30-60 giây cho mỗi video ngắn 30-60s).
 
 ---
 
-## Danh Sách Vấn Đề Kỹ Thuật (Known Issues / Technical Debt)
+## Danh Sách Vấn Đề Kỹ Thuật & Cấu Hình Lưu Ý (Known Issues / Operational Notes)
 
-*Qua quá trình kiểm tra chuyên sâu codebase thực tế, phân tích phát hiện một số điểm kỹ thuật cần lưu ý (Chỉ ghi nhận phân tích, chưa sửa code):*
-
-1. **Sự khác biệt cấu hình giữa Docker Compose và chạy Local Manual:**
-   - Trong `docker-compose.yml`, dịch vụ backend kết nối MinIO qua tên container `minio:9000`, nhưng môi trường local cần dùng `localhost:29000`. Khi cấu hình `.env` cho backend chạy ngoài Docker, cần đảm bảo cập nhật đúng port `29000`.
-2. **Khởi tạo file `config.toml` tự động:**
-   - Hàm `load_config()` trong `engine/app/config/config.py` sẽ tự động copy `config.example.toml` thành `config.toml` nếu chưa tồn tại. Tuy nhiên, nếu file `config.toml` chưa được điền `gemini_api_key` hoặc `pexels_api_keys`, Python CLI sẽ báo lỗi ngay khi bắt đầu nhiệm vụ.
-3. **Giới hạn số lượng truy vấn Pexels Free Tier:**
-   - API Key miễn phí của Pexels bị giới hạn 200 requests/giờ. Nếu sinh video hàng loạt với số lượng lớn trong hệ thống Affiliate, nên cấu hình mảng nhiều API Keys trong `pexels_api_keys = ["key1", "key2"]` để hệ thống tự xoay vòng key (codebase ở `material.py` đã hỗ trợ sẵn cơ chế xoay vòng key này qua biến `_api_key_counter`).
-
----
-
-## Implemented Affiliate MVP
-
-Đã triển khai thành công MVP Hệ thống Affiliate Short Video Generator trên codebase hiện tại theo đúng thiết kế 12 Phases:
-
-### 1. Files Added & Modified
-- **Database (`backend/prisma/schema.prisma`):**
-  - Thêm model `Product` (`id`, `name`, `description`, `price`, `currency`, `affiliateUrl`, `features`, `benefits`, `targetAudience`, `images`, `createdAt`, `updatedAt`).
-  - Thêm quan hệ optional `productId` vào model `Idea` và `GenerationJob`.
-- **Backend Service (`backend/src/modules/products/`):**
-  - `products.module.ts`: Khai báo module sản phẩm.
-  - `products.service.ts`: Xử lý CRUD sản phẩm & hàm `generateVideo(id, config)` kết nối với Queue.
-  - `products.controller.ts`: Cung cấp các API endpoint `POST /api/products`, `GET /api/products`, `GET /api/products/:id`, `PATCH /api/products/:id`, `DELETE /api/products/:id`, `POST /api/products/:id/generate-video`.
-  - `backend/src/app.module.ts`: Đăng ký `ProductsModule`.
-  - `backend/src/modules/queue/queue.service.ts`: Bổ sung `productId` vào `VideoJobConfig` và `VideoJobPayload`.
-  - `backend/src/modules/queue/video.processor.ts`: Đọc dữ liệu `Product` từ DB và truyền `--product-data` dưới dạng JSON sang Python CLI.
-- **Frontend Dashboard (`frontend/`):**
-  - `frontend/src/components/Sidebar.tsx`: Thêm mục "Sản phẩm (Affiliate)" dẫn đến `/products`.
-  - `frontend/src/app/products/page.tsx`: Màn hình Quản lý Sản phẩm Affiliate, hiển thị danh sách dạng Card, xem link affiliate, xóa sản phẩm, Modal thêm sản phẩm mới và nút "Tạo Video 9:16" trực tiếp.
-- **Python Engine (`engine/`):**
-  - `engine/app/models/schema.py`: Bổ sung trường `product_data` vào dataclass `VideoParams`.
-  - `engine/cli.py`: Bổ sung tham số `--product-data` vào ArgumentParser và xử lý parse JSON trong `build_video_params()`.
-  - `engine/app/services/llm.py`: Thêm `DEFAULT_AFFILIATE_SYSTEM_PROMPT` với cấu trúc kịch bản bán hàng chuẩn (HOOK 0-3s -> PROBLEM 3-8s -> SOLUTION 8-20s -> BENEFITS 20-35s -> REASON 35-45s -> CTA 45-55s). Cập nhật `build_script_prompt()` và `generate_script()` tự động sử dụng Affiliate Prompt khi có `product_data`.
-  - `engine/app/services/material.py`: Thêm hàm `process_product_images()` tự động tải URL ảnh sản phẩm (hoặc file local), crop/pad thành khổ 9:16 và chuyển đổi thành các clip video ngắn (3s).
-  - `engine/app/services/task.py`: Cập nhật `generate_script()` truyền `product_data` sang LLM và `get_video_materials()` trộn lẫn clip hình ảnh sản phẩm với video B-roll Pexels/Pixabay.
-
-### 2. Backward Compatibility
-- Tính năng tạo video bằng **Topic đơn thuần (Topic-only generation)** giữ nguyên 100%. Khi không truyền `productId` hoặc `product_data`, hệ thống tự động sử dụng luồng sinh video cũ không có bất kỳ ảnh hưởng nào.
-
+1. **Đồng bộ Schema Database tự động khi khởi động:**
+   - Trong `backend/src/main.ts`, hàm `runDatabasePush()` tự động gọi `npx prisma db push` trước khi app lắng nghe request. Điều này giúp hệ thống tự động tạo và cập nhật đủ 11 bảng trong PostgreSQL mà không cần người dùng gõ lệnh thủ công.
+2. **Cấu hình Endpoint MinIO giữa Docker và Local Manual:**
+   - Trong `docker-compose.yml`, backend kết nối MinIO qua host `minio` port `9000`. Khi chạy backend local không qua Docker, cần đảm bảo `MINIO_ENDPOINT=localhost` và `MINIO_PORT=29000` trong file `.env`.
+3. **Quản lý Giới Hạn Pexels API Key Free Tier:**
+   - Key Pexels miễn phí giới hạn 200 requests/giờ. Codebase tại `engine/app/services/material.py` đã tích hợp sẵn cơ chế xoay vòng key (`_api_key_counter`). Bạn nên điền mảng nhiều keys trong `pexels_api_keys = ["key1", "key2"]` tại `engine/config.toml` để đảm bảo hệ thống không bị gián đoạn khi sinh video hàng loạt.
