@@ -64,29 +64,51 @@ model Product {
   ideas        Idea[]
   jobs         GenerationJob[]
   contentIdeas ContentIdea[]
+  scripts      VideoScript[]
 
   @@map("products")
 }
 
 model ContentIdea {
-  id              String   @id @default(uuid())
+  id              String        @id @default(uuid())
   productId       String
-  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
   title           String
   description     String
-  contentType     String   // product_review, problem_solution, comparison, listicle, educational, storytelling, testimonial, myth_busting, use_case, value_for_money, pros_cons, FAQ
+  contentType     String        // product_review, problem_solution, comparison, listicle, educational, storytelling, testimonial, myth_busting, use_case, value_for_money, pros_cons, FAQ
   marketingAngle  String
   targetAudience  String
   painPoint       String
   keyMessage      String
   hook            String
   recommendedCTA  String
-  priority        Int      @default(1)
-  status          String   @default("draft") // draft, selected, generated, archived
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  priority        Int           @default(1)
+  status          String        @default("draft") // draft, selected, generated, archived
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  scripts         VideoScript[]
 
   @@map("content_ideas")
+}
+
+model VideoScript {
+  id            String       @id @default(uuid())
+  productId     String
+  product       Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  contentIdeaId String?
+  contentIdea   ContentIdea? @relation(fields: [contentIdeaId], references: [id], onDelete: SetNull)
+  title         String
+  duration      Int          @default(30)
+  language      String       @default("vi")
+  hook          String
+  scenes        Json
+  cta           String
+  status        String       @default("ready") // draft, ready, generating, failed
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("video_scripts")
 }
 
 model GenerationJob {

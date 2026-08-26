@@ -11,6 +11,7 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { ProductsModule } from './modules/products/products.module';
 import { ProductResearchModule } from './modules/product-research/product-research.module';
 import { ContentStrategyModule } from './modules/content-strategy/content-strategy.module';
+import { ScriptEngineModule } from './modules/script-engine/script-engine.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ContentStrategyModule } from './modules/content-strategy/content-strate
     ProductsModule,
     ProductResearchModule,
     ContentStrategyModule,
+    ScriptEngineModule,
   ],
 })
 export class AppModule {}

@@ -117,6 +117,32 @@ type ContentIdea = {
   updatedAt: string;
 };
 
+type ScriptScene = {
+  sceneNumber: number;
+  startTime: number;
+  endTime: number;
+  duration: number;
+  narration: string;
+  onScreenText: string;
+  visualDirection: string;
+  mediaType: string;
+};
+
+type VideoScript = {
+  id: string;
+  productId: string;
+  contentIdeaId?: string | null;
+  title: string;
+  duration: number;
+  language: string;
+  hook: string;
+  scenes: ScriptScene[];
+  cta: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 const CONTENT_TYPE_BADGES: Record<string, { label: string; bg: string; text: string }> = {
   product_review: { label: "Review Sản Phẩm", bg: "bg-blue-500/10 border-blue-500/30", text: "text-blue-400" },
   problem_solution: { label: "Vấn Đề & Giải Pháp", bg: "bg-rose-500/10 border-rose-500/30", text: "text-rose-400" },
@@ -148,6 +174,11 @@ export default function ProductsPage() {
   // Content Strategy State
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
   const [selectedIdeaForVideoId, setSelectedIdeaForVideoId] = useState<string | null>(null);
+
+  // Script Engine 2.0 State
+  const [generatingScriptIdeaId, setGeneratingScriptIdeaId] = useState<string | null>(null);
+  const [activeScriptModal, setActiveScriptModal] = useState<VideoScript | null>(null);
+  const [generatingVideoScriptId, setGeneratingVideoScriptId] = useState<string | null>(null);
 
   const { data: contentIdeas = [], isLoading: isLoadingIdeas, refetch: refetchIdeas } = useQuery<ContentIdea[]>({
     queryKey: ["content-ideas", selectedProduct?.id],
@@ -181,6 +212,50 @@ export default function ProductsPage() {
       alert("Lỗi tạo video từ ý tưởng: " + (err.response?.data?.message || err.message));
     } finally {
       setSelectedIdeaForVideoId(null);
+    }
+  };
+
+  const handleGenerateScript = async (ideaId: string) => {
+    try {
+      setGeneratingScriptIdeaId(ideaId);
+      const res = await api.post(`/content-ideas/${ideaId}/generate-script`);
+      setActiveScriptModal(res.data);
+      queryClient.invalidateQueries({ queryKey: ["content-ideas", selectedProduct?.id] });
+    } catch (err: any) {
+      alert("Lỗi tạo kịch bản 2.0: " + (err.response?.data?.message || err.message));
+    } finally {
+      setGeneratingScriptIdeaId(null);
+    }
+  };
+
+  const handleViewScript = async (ideaId: string) => {
+    try {
+      setGeneratingScriptIdeaId(ideaId);
+      const res = await api.get(`/content-ideas/${ideaId}/scripts`);
+      if (res.data && res.data.length > 0) {
+        setActiveScriptModal(res.data[0]);
+      } else {
+        await handleGenerateScript(ideaId);
+      }
+    } catch (err: any) {
+      alert("Lỗi tải kịch bản: " + (err.response?.data?.message || err.message));
+    } finally {
+      setGeneratingScriptIdeaId(null);
+    }
+  };
+
+  const handleGenerateVideoFromScript = async (scriptId: string) => {
+    try {
+      setGeneratingVideoScriptId(scriptId);
+      await api.post(`/scripts/${scriptId}/generate-video`);
+      alert("Đã gửi kịch bản 2.0 sang Video Generation Engine thành công!");
+      setActiveScriptModal(null);
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["content-ideas", selectedProduct?.id] });
+    } catch (err: any) {
+      alert("Lỗi tạo video từ kịch bản: " + (err.response?.data?.message || err.message));
+    } finally {
+      setGeneratingVideoScriptId(null);
     }
   };
 
@@ -1195,18 +1270,33 @@ export default function ProductsPage() {
                                   </h4>
                                 </div>
 
-                                <button
-                                  onClick={() => handleGenerateVideoFromIdea(idea.id)}
-                                  disabled={selectedIdeaForVideoId === idea.id}
-                                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow-lg shadow-violet-600/20 shrink-0 transition-all"
-                                >
-                                  {selectedIdeaForVideoId === idea.id ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Video className="w-4 h-4" />
-                                  )}
-                                  Tạo Video
-                                </button>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    onClick={() => handleViewScript(idea.id)}
+                                    disabled={generatingScriptIdeaId === idea.id}
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-600/20 transition-all"
+                                  >
+                                    {generatingScriptIdeaId === idea.id ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <Sparkles className="w-4 h-4 text-amber-200" />
+                                    )}
+                                    Tạo Kịch Bản 2.0
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleGenerateVideoFromIdea(idea.id)}
+                                    disabled={selectedIdeaForVideoId === idea.id}
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow-lg shadow-violet-600/20 transition-all"
+                                  >
+                                    {selectedIdeaForVideoId === idea.id ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <Video className="w-4 h-4" />
+                                    )}
+                                    Tạo Video
+                                  </button>
+                                </div>
                               </div>
 
                               <p className="text-xs text-zinc-300 leading-relaxed bg-zinc-900/60 p-3 rounded-lg border border-zinc-800/60">
@@ -1336,6 +1426,119 @@ export default function ProductsPage() {
                   </div>
                 </form>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Script Preview Modal (Script Engine 2.0) */}
+      {activeScriptModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6 shadow-2xl relative">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-zinc-800/80 pb-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] uppercase tracking-wider font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    Script Engine 2.0
+                  </span>
+                  <span className="text-xs text-zinc-400 font-semibold flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-zinc-500" /> {activeScriptModal.duration} Giây
+                  </span>
+                </div>
+                <h3 className="text-lg font-extrabold text-zinc-100">{activeScriptModal.title}</h3>
+              </div>
+              <button
+                onClick={() => setActiveScriptModal(null)}
+                className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Hook & CTA Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-amber-400 block">Hook 1-3s (Mở Đầu Nổi Bật)</span>
+                <p className="text-amber-200 font-semibold italic">&quot;{activeScriptModal.hook}&quot;</p>
+              </div>
+              <div className="p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/30 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-sky-400 block">Call To Action (CTA)</span>
+                <p className="text-sky-200 font-medium">{activeScriptModal.cta}</p>
+              </div>
+            </div>
+
+            {/* Scenes List */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center justify-between">
+                <span>Chi Tiết Phân Cảnh ({activeScriptModal.scenes?.length || 0} Cảnh)</span>
+                <span className="text-[11px] text-zinc-500 normal-case">Tự động tối ưu TTS & On-screen Text</span>
+              </h4>
+
+              <div className="space-y-3">
+                {(activeScriptModal.scenes || []).map((scene) => (
+                  <div
+                    key={scene.sceneNumber}
+                    className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3"
+                  >
+                    {/* Scene Header */}
+                    <div className="flex items-center justify-between gap-2 border-b border-zinc-800/50 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                          Cảnh #{scene.sceneNumber}
+                        </span>
+                        <span className="text-xs font-semibold text-zinc-400">
+                          {scene.startTime}s - {scene.endTime}s ({scene.duration}s)
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 uppercase">
+                        {scene.mediaType}
+                      </span>
+                    </div>
+
+                    {/* Scene Breakdown */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                      <div className="md:col-span-2 space-y-1 bg-zinc-950 p-2.5 rounded-lg border border-zinc-800/80">
+                        <span className="text-[10px] uppercase font-bold text-emerald-400 block">Lời thoại TTS (Voiceover)</span>
+                        <p className="text-zinc-200 leading-relaxed font-medium">{scene.narration}</p>
+                      </div>
+
+                      <div className="space-y-1 bg-zinc-950 p-2.5 rounded-lg border border-zinc-800/80">
+                        <span className="text-[10px] uppercase font-bold text-amber-300 block">On-Screen Subtitle</span>
+                        <p className="text-amber-200 font-extrabold tracking-wide uppercase">{scene.onScreenText}</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-zinc-950/60 p-2.5 rounded-lg border border-zinc-800/50 text-xs">
+                      <span className="text-[10px] uppercase font-bold text-violet-400 block">Chỉ dẫn hình ảnh (Visual Direction)</span>
+                      <p className="text-zinc-300 italic">{scene.visualDirection}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer Action */}
+            <div className="flex items-center justify-between gap-3 pt-4 border-t border-zinc-800">
+              <button
+                onClick={() => setActiveScriptModal(null)}
+                className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-semibold"
+              >
+                Đóng Preview
+              </button>
+
+              <button
+                onClick={() => handleGenerateVideoFromScript(activeScriptModal.id)}
+                disabled={generatingVideoScriptId === activeScriptModal.id}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow-lg shadow-violet-600/30 transition-all"
+              >
+                {generatingVideoScriptId === activeScriptModal.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Video className="w-4 h-4" />
+                )}
+                Tạo Video Từ Kịch Bản 2.0
+              </button>
             </div>
           </div>
         </div>
