@@ -12,6 +12,8 @@ import { ProductsModule } from './modules/products/products.module';
 import { ProductResearchModule } from './modules/product-research/product-research.module';
 import { ContentStrategyModule } from './modules/content-strategy/content-strategy.module';
 import { ScriptEngineModule } from './modules/script-engine/script-engine.module';
+import { PublishingModule } from './modules/publishing/publishing.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -39,6 +41,9 @@ import { ScriptEngineModule } from './modules/script-engine/script-engine.module
     ProductResearchModule,
     ContentStrategyModule,
     ScriptEngineModule,
+    PublishingModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}
+

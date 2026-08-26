@@ -13,6 +13,8 @@ import {
   Terminal,
   ChevronLeft,
   ChevronRight,
+  Share2,
+  BarChart3,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -44,6 +46,8 @@ export default function Sidebar() {
     { name: "Ý tưởng (Ideas)", href: "/ideas", icon: Lightbulb },
     { name: "Hàng đợi (Jobs)", href: "/jobs", icon: PlayCircle },
     { name: "Thư viện Video", href: "/videos", icon: Video },
+    { name: "Đăng Video (Publishing)", href: "/publishing", icon: Share2 },
+    { name: "Phân tích (Analytics)", href: "/analytics", icon: BarChart3 },
     { name: "Cấu hình (Settings)", href: "/settings", icon: Settings },
   ];
 

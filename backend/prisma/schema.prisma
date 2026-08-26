@@ -148,6 +148,8 @@ model Video {
   ratio              String   @default("9:16")
   createdAt          DateTime @default(now())
 
+  publishJobs        PublishJob[]
+
   @@map("videos")
 }
 
@@ -169,4 +171,77 @@ model SystemSetting {
 
   @@map("system_settings")
 }
+
+model PlatformAccount {
+  id             String   @id @default(uuid())
+  platform       String   // TIKTOK, YOUTUBE, INSTAGRAM, FACEBOOK
+  accountName    String
+  accountId      String?
+  accessToken    String?  // Encrypted at rest
+  refreshToken   String?  // Encrypted at rest
+  tokenExpiresAt DateTime?
+  status         String   @default("ACTIVE") // ACTIVE, EXPIRED, REVOKED, DISCONNECTED, NOT_CONFIGURED
+  metadata       Json?    @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  publishJobs    PublishJob[]
+
+  @@map("platform_accounts")
+}
+
+model PublishJob {
+  id                 String          @id @default(uuid())
+  videoId            String
+  video              Video           @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  platformAccountId  String
+  platformAccount    PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+  platform           String          // TIKTOK, YOUTUBE, INSTAGRAM, FACEBOOK
+  title              String?
+  description        String?
+  caption            String?
+  hashtags           String[]        @default([])
+  tags               String[]        @default([])
+  privacyStatus      String?         // public, private, unlisted, etc.
+  platformMetadata   Json?           @default("{}")
+  scheduledAt        DateTime?
+  publishedAt        DateTime?
+  status             String          @default("DRAFT") // DRAFT, SCHEDULED, QUEUED, PUBLISHING, PUBLISHED, FAILED, CANCELLED
+  platformPostId     String?
+  platformUrl        String?
+  errorMessage       String?
+  errorCode          String?
+  retryCount         Int             @default(0)
+  lastAttemptAt      DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  analyticsSnapshots PostAnalytics[]
+
+  @@index([videoId, platformAccountId])
+  @@map("publish_jobs")
+}
+
+model PostAnalytics {
+  id               String     @id @default(uuid())
+  publishJobId     String
+  publishJob       PublishJob @relation(fields: [publishJobId], references: [id], onDelete: Cascade)
+  platformPostId   String?
+  collectedAt      DateTime   @default(now())
+  views            BigInt     @default(0)
+  likes            Int        @default(0)
+  comments         Int        @default(0)
+  shares           Int        @default(0)
+  saves            Int        @default(0)
+  clicks           Int        @default(0)
+  watchTime        Float?
+  averageWatchTime Float?
+  completionRate   Float?
+  engagementRate   Float?
+  rawMetadata      Json?
+
+  @@index([publishJobId, collectedAt])
+  @@map("post_analytics")
+}
+
 
