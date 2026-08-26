@@ -10,6 +10,7 @@ import { VideosModule } from './modules/videos/videos.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { ProductsModule } from './modules/products/products.module';
 import { ProductResearchModule } from './modules/product-research/product-research.module';
+import { ContentStrategyModule } from './modules/content-strategy/content-strategy.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { ProductResearchModule } from './modules/product-research/product-resear
     SettingsModule,
     ProductsModule,
     ProductResearchModule,
+    ContentStrategyModule,
   ],
 })
 export class AppModule {}

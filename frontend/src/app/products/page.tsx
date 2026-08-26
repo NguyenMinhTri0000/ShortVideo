@@ -99,6 +99,39 @@ type ResearchResult = {
   };
 };
 
+type ContentIdea = {
+  id: string;
+  productId: string;
+  title: string;
+  description: string;
+  contentType: string;
+  marketingAngle: string;
+  targetAudience: string;
+  painPoint: string;
+  keyMessage: string;
+  hook: string;
+  recommendedCTA: string;
+  priority: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const CONTENT_TYPE_BADGES: Record<string, { label: string; bg: string; text: string }> = {
+  product_review: { label: "Review Sản Phẩm", bg: "bg-blue-500/10 border-blue-500/30", text: "text-blue-400" },
+  problem_solution: { label: "Vấn Đề & Giải Pháp", bg: "bg-rose-500/10 border-rose-500/30", text: "text-rose-400" },
+  comparison: { label: "So Sánh Thực Tế", bg: "bg-amber-500/10 border-amber-500/30", text: "text-amber-400" },
+  listicle: { label: "Top Mẹo / Danh Sách", bg: "bg-purple-500/10 border-purple-500/30", text: "text-purple-400" },
+  educational: { label: "Hướng Dẫn & Mẹo", bg: "bg-sky-500/10 border-sky-500/30", text: "text-sky-400" },
+  storytelling: { label: "Câu Chuyện / Bối Cảnh", bg: "bg-pink-500/10 border-pink-500/30", text: "text-pink-400" },
+  testimonial: { label: "Góc Nhìn Khách Hàng", bg: "bg-teal-500/10 border-teal-500/30", text: "text-teal-400" },
+  myth_busting: { label: "Giải Mã Hiểu Lầm", bg: "bg-orange-500/10 border-orange-500/30", text: "text-orange-400" },
+  use_case: { label: "Kịch Bản Sử Dụng", bg: "bg-indigo-500/10 border-indigo-500/30", text: "text-indigo-400" },
+  value_for_money: { label: "Phân Tích Đáng Tiền", bg: "bg-emerald-500/10 border-emerald-500/30", text: "text-emerald-400" },
+  pros_cons: { label: "Ưu & Nhược Điểm", bg: "bg-cyan-500/10 border-cyan-500/30", text: "text-cyan-400" },
+  FAQ: { label: "Giải Đáp Thắc Mắc", bg: "bg-violet-500/10 border-violet-500/30", text: "text-violet-400" },
+};
+
 export default function ProductsPage() {
   const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -110,7 +143,46 @@ export default function ProductsPage() {
   const [researchResult, setResearchResult] = useState<ResearchResult | null>(null);
   const [isResearchPanelExpanded, setIsResearchPanelExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<"specs" | "ai" | "brief">("ai");
-  const [modalTab, setModalTab] = useState<"view" | "edit">("view");
+  const [modalTab, setModalTab] = useState<"view" | "ideas" | "edit">("view");
+
+  // Content Strategy State
+  const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
+  const [selectedIdeaForVideoId, setSelectedIdeaForVideoId] = useState<string | null>(null);
+
+  const { data: contentIdeas = [], isLoading: isLoadingIdeas, refetch: refetchIdeas } = useQuery<ContentIdea[]>({
+    queryKey: ["content-ideas", selectedProduct?.id],
+    queryFn: () =>
+      selectedProduct
+        ? api.get(`/products/${selectedProduct.id}/content-ideas`).then((res) => res.data)
+        : Promise.resolve([]),
+    enabled: !!selectedProduct,
+  });
+
+  const handleGenerateContentIdeas = async (productId: string) => {
+    try {
+      setIsGeneratingIdeas(true);
+      await api.post(`/products/${productId}/content-ideas/generate`);
+      await refetchIdeas();
+    } catch (err: any) {
+      alert("Lỗi tạo ý tưởng nội dung: " + (err.response?.data?.message || err.message));
+    } finally {
+      setIsGeneratingIdeas(false);
+    }
+  };
+
+  const handleGenerateVideoFromIdea = async (ideaId: string) => {
+    try {
+      setSelectedIdeaForVideoId(ideaId);
+      await api.post(`/content-ideas/${ideaId}/generate-video`);
+      alert("Đã tạo Job video từ ý tưởng này thành công! Video đang được tạo trong hàng đợi.");
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["content-ideas", selectedProduct?.id] });
+    } catch (err: any) {
+      alert("Lỗi tạo video từ ý tưởng: " + (err.response?.data?.message || err.message));
+    } finally {
+      setSelectedIdeaForVideoId(null);
+    }
+  };
 
   // Manual Form State
   const [name, setName] = useState("");
@@ -912,6 +984,17 @@ export default function ProductsPage() {
                 Xem Kết Quả Phân Tích AI
               </button>
               <button
+                onClick={() => setModalTab("ideas")}
+                className={`px-4 py-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+                  modalTab === "ideas"
+                    ? "border-amber-500 text-amber-400 bg-amber-500/5"
+                    : "border-transparent text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <Zap className="w-4 h-4 text-amber-400" />
+                Ý Tưởng Nội Dung AI ({contentIdeas.length})
+              </button>
+              <button
                 onClick={() => setModalTab("edit")}
                 className={`px-4 py-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
                   modalTab === "edit"
@@ -1019,6 +1102,142 @@ export default function ProductsPage() {
                       <RotateCw className="w-3.5 h-3.5" /> Chạy Lại Research
                     </button>
                   </div>
+                </div>
+              ) : modalTab === "ideas" ? (
+                <div className="space-y-6">
+                  {/* Action Header */}
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-violet-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-amber-300 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-amber-400" /> Chiến Lược Nội Dung & Ý Tưởng Video (Content Strategy)
+                      </h4>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        Tự động phân tích từ dữ liệu nghiên cứu sản phẩm để đề xuất 10-20 góc khai thác video độc đáo trước khi tạo kịch bản.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleGenerateContentIdeas(selectedProduct.id)}
+                      disabled={isGeneratingIdeas}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-600/20 shrink-0 transition-all"
+                    >
+                      {isGeneratingIdeas ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Zap className="w-4 h-4" />
+                      )}
+                      {contentIdeas.length > 0 ? "Tạo Lại 10-20 Ý Tưởng Mới" : "Tạo Ý Tưởng Nội Dung (AI)"}
+                    </button>
+                  </div>
+
+                  {/* Ideas List */}
+                  {isLoadingIdeas || isGeneratingIdeas ? (
+                    <div className="p-12 text-center space-y-3 bg-zinc-950/40 rounded-xl border border-zinc-800">
+                      <Loader2 className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
+                      <p className="text-xs text-zinc-300 font-medium">Đang dùng AI tạo 10-20 góc nội dung độc đáo cho sản phẩm...</p>
+                      <p className="text-[11px] text-zinc-500">Đang phân tích tính năng, nỗi đau người dùng, ưu nhược điểm và lập định dạng video</p>
+                    </div>
+                  ) : contentIdeas.length === 0 ? (
+                    <div className="p-10 text-center space-y-3 bg-zinc-950/40 rounded-xl border border-zinc-800">
+                      <Target className="w-10 h-10 text-zinc-600 mx-auto" />
+                      <h5 className="text-sm font-bold text-zinc-300">Chưa có Ý tưởng Nội dung nào</h5>
+                      <p className="text-xs text-zinc-400 max-w-md mx-auto">
+                        Bấm nút &quot;Tạo Ý Tưởng Nội Dung (AI)&quot; ở trên để AI tạo tự động từ 10 đến 20 góc tiếp thị khác nhau.
+                      </p>
+                      <button
+                        onClick={() => handleGenerateContentIdeas(selectedProduct.id)}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all mt-2"
+                      >
+                        <Zap className="w-4 h-4" /> Bắt Đầu Tạo Ý Tưởng AI
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between text-xs text-zinc-400 font-medium px-1">
+                        <span>Danh sách {contentIdeas.length} ý tưởng nội dung độc đáo:</span>
+                        <span className="text-emerald-400 font-semibold">Chọn ý tưởng → Bấm &quot;Tạo Video&quot;</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4">
+                        {contentIdeas.map((idea, index) => {
+                          const badge = CONTENT_TYPE_BADGES[idea.contentType] || {
+                            label: idea.contentType,
+                            bg: "bg-zinc-800 border-zinc-700",
+                            text: "text-zinc-300",
+                          };
+
+                          return (
+                            <div
+                              key={idea.id}
+                              className="p-5 rounded-xl bg-zinc-950 border border-zinc-800/80 hover:border-zinc-700 transition-all space-y-4 shadow-lg group relative overflow-hidden"
+                            >
+                              {/* Top Bar */}
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                                      #{index + 1}
+                                    </span>
+                                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${badge.bg} ${badge.text}`}>
+                                      {badge.label}
+                                    </span>
+                                    <span className="text-[11px] px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
+                                      Góc: {idea.marketingAngle}
+                                    </span>
+                                    {idea.priority === 1 && (
+                                      <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold flex items-center gap-1">
+                                        <Award className="w-3 h-3" /> Đề xuất cao
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <h4 className="text-base font-bold text-zinc-100 group-hover:text-amber-300 transition-colors pt-1">
+                                    {idea.title}
+                                  </h4>
+                                </div>
+
+                                <button
+                                  onClick={() => handleGenerateVideoFromIdea(idea.id)}
+                                  disabled={selectedIdeaForVideoId === idea.id}
+                                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow-lg shadow-violet-600/20 shrink-0 transition-all"
+                                >
+                                  {selectedIdeaForVideoId === idea.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Video className="w-4 h-4" />
+                                  )}
+                                  Tạo Video
+                                </button>
+                              </div>
+
+                              <p className="text-xs text-zinc-300 leading-relaxed bg-zinc-900/60 p-3 rounded-lg border border-zinc-800/60">
+                                {idea.description}
+                              </p>
+
+                              {/* Strategy Breakdown */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                <div className="p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/50">
+                                  <span className="text-zinc-500 text-[10px] uppercase font-semibold block">Đối tượng khán giả</span>
+                                  <span className="text-zinc-200 font-medium">{idea.targetAudience}</span>
+                                </div>
+                                <div className="p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/50">
+                                  <span className="text-zinc-500 text-[10px] uppercase font-semibold block">Nỗi đau / Vấn đề</span>
+                                  <span className="text-rose-300 font-medium">{idea.painPoint}</span>
+                                </div>
+                                <div className="p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/50">
+                                  <span className="text-zinc-500 text-[10px] uppercase font-semibold block">Hook mở đầu 3s</span>
+                                  <span className="text-amber-300 italic font-medium">&quot;{idea.hook}&quot;</span>
+                                </div>
+                                <div className="p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/50">
+                                  <span className="text-zinc-500 text-[10px] uppercase font-semibold block">CTA Kêu gọi</span>
+                                  <span className="text-sky-300 font-medium">{idea.recommendedCTA}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Edit Form Tab */

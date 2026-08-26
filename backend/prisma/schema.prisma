@@ -61,10 +61,32 @@ model Product {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  ideas Idea[]
-  jobs  GenerationJob[]
+  ideas        Idea[]
+  jobs         GenerationJob[]
+  contentIdeas ContentIdea[]
 
   @@map("products")
+}
+
+model ContentIdea {
+  id              String   @id @default(uuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title           String
+  description     String
+  contentType     String   // product_review, problem_solution, comparison, listicle, educational, storytelling, testimonial, myth_busting, use_case, value_for_money, pros_cons, FAQ
+  marketingAngle  String
+  targetAudience  String
+  painPoint       String
+  keyMessage      String
+  hook            String
+  recommendedCTA  String
+  priority        Int      @default(1)
+  status          String   @default("draft") // draft, selected, generated, archived
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("content_ideas")
 }
 
 model GenerationJob {
