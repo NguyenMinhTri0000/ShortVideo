@@ -9,6 +9,7 @@ import { JobsModule } from './modules/jobs/jobs.module';
 import { VideosModule } from './modules/videos/videos.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { ProductsModule } from './modules/products/products.module';
+import { ProductResearchModule } from './modules/product-research/product-research.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ProductsModule } from './modules/products/products.module';
     VideosModule,
     SettingsModule,
     ProductsModule,
+    ProductResearchModule,
   ],
 })
 export class AppModule {}
