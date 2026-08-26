@@ -1,68 +1,23 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
-import { LlmService } from '../llm/llm.service';
+import { ProductAnalysisService } from './product-analysis.service';
+import { ContentBriefService } from './content-brief.service';
 import { ProductSourceAdapter } from './adapters/product-source.adapter';
 import { GenericProductAdapter } from './adapters/generic-product.adapter';
+import { ShopeeAdapter } from './adapters/shopee.adapter';
+import { LazadaAdapter } from './adapters/lazada.adapter';
+import { TikTokShopAdapter } from './adapters/tiktok-shop.adapter';
+import { AmazonAdapter } from './adapters/amazon.adapter';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import type { ProductResearchJobPayload } from './product-research.processor';
 import type {
-  RawProductData,
-  AiProductAnalysis,
   ProductResearchResult,
+  RawProductData,
   MarketingAngle,
 } from './types/product-research.types';
 import { ResearchStatus } from './types/product-research.types';
-
-type GeminiResponse = {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text?: string;
-      }>;
-    };
-  }>;
-};
-
-type OpenAICompatibleResponse = {
-  choices?: Array<{
-    message?: {
-      content?: string;
-    };
-  }>;
-};
-
-const PRODUCT_ANALYSIS_PROMPT = `
-You are a product marketing analyst. Analyze the following product information and return a structured JSON object.
-
-IMPORTANT RULES:
-- Only use information that is present in the provided data.
-- Do NOT invent price, specifications, certifications, warranty, performance numbers, discounts, reviews, or claims.
-- If information is not available, use null or an empty array.
-- Respond with ONLY the JSON object, no markdown code blocks, no explanation.
-
-Product Information:
----
-{PRODUCT_DATA}
----
-
-Return this exact JSON structure:
-{
-  "category": "Product category (e.g. Kitchen Appliance, Electronics, Fashion) or null if unknown",
-  "features": ["List of key product features extracted from the data"],
-  "benefits": ["List of customer benefits derived from the features"],
-  "usp": ["Unique selling points that differentiate this product"],
-  "targetAudience": ["Who would buy this product"],
-  "painPoints": ["Problems this product solves"],
-  "marketingAngles": [
-    {
-      "title": "Short marketing angle title",
-      "description": "Brief description of the angle",
-      "hook": "Attention-grabbing opening line for a video"
-    }
-  ]
-}
-
-Respond in Vietnamese. Return ONLY valid JSON.
-`.trim();
 
 @Injectable()
 export class ProductResearchService {
@@ -71,143 +26,233 @@ export class ProductResearchService {
 
   constructor(
     private prisma: PrismaService,
-    private llmService: LlmService,
+    private productAnalysisService: ProductAnalysisService,
+    private contentBriefService: ContentBriefService,
+    @InjectQueue('product-research')
+    private researchQueue?: Queue<ProductResearchJobPayload>,
   ) {
-    // Register adapters in priority order.
-    // Future platform-specific adapters (Shopee, TikTok Shop, Lazada)
-    // should be inserted BEFORE the generic adapter.
-    this.adapters = [new GenericProductAdapter()];
+    // Platform adapters registered in priority order before generic fallback
+    this.adapters = [
+      new ShopeeAdapter(),
+      new LazadaAdapter(),
+      new TikTokShopAdapter(),
+      new AmazonAdapter(),
+      new GenericProductAdapter(),
+    ];
   }
 
   /**
-   * Full research pipeline:
-   * URL → validate → select adapter → extract → AI analyze → save → return
+   * API entrypoint: Accepts URL, selects adapter, creates pending Product record,
+   * enqueues background worker job, and returns initial result immediately.
    */
   async researchProduct(url: string): Promise<ProductResearchResult> {
-    this.logger.log(`Starting product research for: ${url}`);
+    this.logger.log(`[ProductResearch] Starting research for: ${url}`);
 
-    // 1. Select adapter
-    const adapter = this.selectAdapter(url);
+    if (!url || typeof url !== 'string' || !url.trim()) {
+      throw new BadRequestException('Vui lòng cung cấp URL sản phẩm hợp lệ');
+    }
+
+    const cleanedUrl = url.trim();
+    const adapter = this.selectAdapter(cleanedUrl);
     if (!adapter) {
       return {
         success: false,
         error: {
           code: 'NO_ADAPTER',
-          message: 'Không hỗ trợ URL này. Vui lòng thử URL khác.',
+          message: 'Không hỗ trợ URL này. Vui lòng kiểm tra lại đường dẫn.',
         },
       };
     }
 
-    // 2. Create a pending product record
+    // Create pending Product record
     let product = await this.prisma.product.create({
       data: {
-        name: 'Đang nghiên cứu...',
-        affiliateUrl: url,
-        sourceUrl: url,
-        researchStatus: ResearchStatus.RESEARCHING,
+        name: 'Đang nghiên cứu sản phẩm...',
+        affiliateUrl: cleanedUrl,
+        sourceUrl: cleanedUrl,
+        sourcePlatform: adapter.name,
+        researchStatus: ResearchStatus.PENDING,
       },
     });
 
+    this.logger.log(`[Database] Initial pending Product created: ${product.id}`);
+
+    let jobId: string | undefined;
+
+    // Enqueue job if BullMQ queue is available
+    if (this.researchQueue) {
+      try {
+        const job = await this.researchQueue.add(
+          'process-product-research',
+          { productId: product.id, url: cleanedUrl },
+          { attempts: 2, backoff: 5000, removeOnComplete: 100, removeOnFail: 200 },
+        );
+        jobId = job.id;
+        this.logger.log(`[Worker] Enqueued research job ${jobId} for product ${product.id}`);
+
+        await this.prisma.product.update({
+          where: { id: product.id },
+          data: { researchStatus: ResearchStatus.PROCESSING },
+        });
+      } catch (queueErr) {
+        this.logger.warn(
+          `[Worker] Failed to enqueue job via Redis queue, falling back to inline execution: ${queueErr}`,
+        );
+        // Fallback to inline async execution
+        this.executeResearchPipeline(product.id, cleanedUrl).catch((err) => {
+          this.logger.error(`[Worker] Async inline research pipeline error: ${err}`);
+        });
+      }
+    } else {
+      // Fallback to inline async execution
+      this.executeResearchPipeline(product.id, cleanedUrl).catch((err) => {
+        this.logger.error(`[Worker] Async inline research pipeline error: ${err}`);
+      });
+    }
+
+    return {
+      success: true,
+      jobId,
+      product: this.mapProductToResult(product),
+    };
+  }
+
+  /**
+   * Worker / Queue Execution Pipeline:
+   * Fetch -> Extract -> Normalize -> AI Analysis -> Content Brief -> DB Update
+   */
+  async executeResearchPipeline(
+    productId: string,
+    url: string,
+  ): Promise<ProductResearchResult> {
+    this.logger.log(`[ProductResearch] Executing pipeline for productId=${productId}`);
+
+    await this.prisma.product.update({
+      where: { id: productId },
+      data: { researchStatus: ResearchStatus.PROCESSING, researchError: null },
+    });
+
+    const adapter = this.selectAdapter(url);
+    if (!adapter) {
+      throw new Error(`No adapter found for URL: ${url}`);
+    }
+
     try {
-      // 3. Extract raw product data
-      this.logger.log(`Using adapter "${adapter.name}" for extraction`);
-      const rawData = await adapter.extract(url);
+      // Step 1: Extraction
+      this.logger.log(`[Extract] Adapter "${adapter.name}" extracting from ${url}`);
+      const rawData: RawProductData = await adapter.extract(url);
+
+      if (!rawData.title && !rawData.description && rawData.images.length === 0) {
+        throw new Error(
+          'Không thể trích xuất thông tin sản phẩm từ trang này. Trang có thể bị chặn hoặc không có nội dung.',
+        );
+      }
+
       this.logger.log(
-        `Extraction complete: title="${rawData.title}", images=${rawData.images.length}`,
+        `[Normalize] Extracted raw product data: title="${rawData.title}", images=${rawData.images.length}, price="${rawData.price || 'N/A'}"`,
       );
 
-      if (!rawData.title && !rawData.description) {
-        throw new Error(
-          'Không thể trích xuất thông tin sản phẩm từ trang này. Trang có thể không chứa dữ liệu sản phẩm hoặc đã chặn truy cập.',
-        );
-      }
+      // Step 2: AI Analysis
+      this.logger.log(`[AIAnalysis] Starting AI analysis...`);
+      let aiAnalysis;
+      let isPartial = false;
 
-      // 4. AI analysis
-      let aiAnalysis: AiProductAnalysis | null = null;
       try {
-        aiAnalysis = await this.analyzeWithAi(rawData);
-        this.logger.log(`AI analysis complete: category="${aiAnalysis?.category}"`);
-      } catch (aiError) {
-        this.logger.warn(
-          `AI analysis failed, proceeding with raw data only: ${aiError instanceof Error ? aiError.message : String(aiError)}`,
+        aiAnalysis = await this.productAnalysisService.analyzeProduct(rawData);
+        this.logger.log(
+          `[AIAnalysis] Completed successfully: category="${aiAnalysis.category || 'N/A'}", angles=${aiAnalysis.marketingAngles.length}`,
         );
-        // AI failure is non-fatal — we still save the extracted data
+      } catch (aiErr) {
+        isPartial = true;
+        this.logger.warn(`[AIAnalysis] Warning during AI analysis: ${aiErr}`);
       }
 
-      // 5. Update product with extracted + analyzed data
-      product = await this.prisma.product.update({
-        where: { id: product.id },
+      // Step 3: Content Brief Generation
+      this.logger.log(`[ContentBrief] Generating reusable Product Content Brief...`);
+      const contentBrief = aiAnalysis
+        ? this.contentBriefService.generateBrief(rawData, aiAnalysis)
+        : null;
+
+      // Step 4: DB Update
+      const finalStatus = isPartial ? ResearchStatus.PARTIAL : ResearchStatus.COMPLETED;
+
+      const derivedName =
+        rawData.title?.trim() ||
+        (contentBrief?.product && contentBrief.product !== 'Sản phẩm' ? contentBrief.product : null) ||
+        (rawData.brand ? `Sản phẩm ${rawData.brand}` : null) ||
+        (rawData.description ? rawData.description.substring(0, 60) : null) ||
+        `Sản phẩm từ ${adapter.name}`;
+
+      const updatedProduct = await this.prisma.product.update({
+        where: { id: productId },
         data: {
-          name: rawData.title || 'Sản phẩm không tên',
-          description: rawData.description,
-          price: rawData.price,
+          name: derivedName,
+          brand: rawData.brand || aiAnalysis?.category || null,
+          category: aiAnalysis?.category || rawData.category || null,
+          description: rawData.description || aiAnalysis?.summary || null,
+          price: rawData.price || null,
+          originalPrice: rawData.originalPrice || null,
           currency: rawData.currency || 'VND',
+          discountPercent: rawData.discountPercent || null,
+          rating: rawData.rating || null,
+          reviewCount: rawData.reviewCount || null,
           affiliateUrl: url,
-          images: rawData.images,
-          features: aiAnalysis?.features || rawData.features || [],
-          benefits: aiAnalysis?.benefits || [],
-          targetAudience: aiAnalysis?.targetAudience?.join(', ') || null,
           sourceUrl: url,
-          category: aiAnalysis?.category || null,
-          usp: aiAnalysis?.usp || [],
+          sourcePlatform: adapter.name,
+          images: rawData.images || [],
+          videos: rawData.videos || [],
+          features: aiAnalysis?.features || rawData.features || [],
+          specifications: rawData.specifications
+            ? (rawData.specifications as unknown as Prisma.InputJsonValue)
+            : Prisma.DbNull,
+          benefits: aiAnalysis?.benefits || [],
+          pros: aiAnalysis?.pros || [],
+          cons: aiAnalysis?.cons || [],
+          targetAudience: aiAnalysis?.targetAudience
+            ? aiAnalysis.targetAudience.join(', ')
+            : null,
+          useCases: aiAnalysis?.useCases || [],
+          usp: aiAnalysis?.usp || aiAnalysis?.sellingPoints || [],
           painPoints: aiAnalysis?.painPoints || [],
           marketingAngles: aiAnalysis?.marketingAngles
             ? (aiAnalysis.marketingAngles as unknown as Prisma.InputJsonValue)
             : Prisma.DbNull,
+          contentBrief: contentBrief
+            ? (contentBrief as unknown as Prisma.InputJsonValue)
+            : Prisma.DbNull,
           researchRawData: rawData as unknown as Prisma.InputJsonValue,
-          researchStatus: ResearchStatus.COMPLETED,
+          researchStatus: finalStatus,
           researchedAt: new Date(),
           researchError: null,
         },
       });
 
-      this.logger.log(`Product saved: id=${product.id}, name="${product.name}"`);
+      this.logger.log(
+        `[Database] Product saved successfully: id=${updatedProduct.id}, status=${finalStatus}`,
+      );
 
       return {
         success: true,
-        product: {
-          id: product.id,
-          name: product.name,
-          description: product.description,
-          price: product.price,
-          currency: product.currency,
-          affiliateUrl: product.affiliateUrl,
-          images: product.images,
-          features: product.features,
-          benefits: product.benefits,
-          targetAudience: product.targetAudience,
-          usp: (product as any).usp || [],
-          painPoints: (product as any).painPoints || [],
-          category: (product as any).category || null,
-          marketingAngles: (product as any).marketingAngles as MarketingAngle[] | null,
-          sourceUrl: (product as any).sourceUrl || null,
-          researchStatus: (product as any).researchStatus || null,
-          researchedAt: (product as any).researchedAt || null,
-        },
+        product: this.mapProductToResult(updatedProduct),
       };
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      this.logger.error(`Product research failed: ${errorMessage}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[ProductResearch] Pipeline failed for productId=${productId}: ${errorMessage}`);
 
-      // Update product with error status
-      await this.prisma.product
+      const failedProduct = await this.prisma.product
         .update({
-          where: { id: product.id },
+          where: { id: productId },
           data: {
             researchStatus: ResearchStatus.FAILED,
             researchError: errorMessage,
             name: 'Nghiên cứu thất bại',
           },
         })
-        .catch((updateErr) => {
-          this.logger.error(
-            `Failed to update product error status: ${updateErr instanceof Error ? updateErr.message : String(updateErr)}`,
-          );
-        });
+        .catch(() => null);
 
       return {
         success: false,
+        product: failedProduct ? this.mapProductToResult(failedProduct) : undefined,
         error: {
           code: 'RESEARCH_FAILED',
           message: errorMessage,
@@ -217,8 +262,26 @@ export class ProductResearchService {
   }
 
   // ---------------------------------------------------------------------------
-  // Adapter selection
+  // Status and detail lookups
   // ---------------------------------------------------------------------------
+
+  async getProductResearchStatus(id: string): Promise<ProductResearchResult> {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!product) {
+      return {
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Không tìm thấy sản phẩm' },
+      };
+    }
+
+    return {
+      success: true,
+      product: this.mapProductToResult(product),
+    };
+  }
 
   private selectAdapter(url: string): ProductSourceAdapter | null {
     for (const adapter of this.adapters) {
@@ -229,241 +292,40 @@ export class ProductResearchService {
     return null;
   }
 
-  // ---------------------------------------------------------------------------
-  // AI product analysis
-  // ---------------------------------------------------------------------------
-
-  private async analyzeWithAi(
-    rawData: RawProductData,
-  ): Promise<AiProductAnalysis> {
-    const { provider, apiKey, model } =
-      await this.llmService.getActiveProviderConfig();
-
-    if (!apiKey) {
-      throw new Error(
-        'Chưa cấu hình API key cho AI. Vào Cài đặt để cấu hình.',
-      );
-    }
-
-    // Build product data summary for the prompt
-    const productSummary = [
-      rawData.title ? `Tên sản phẩm: ${rawData.title}` : null,
-      rawData.description
-        ? `Mô tả: ${rawData.description.substring(0, 2000)}`
-        : null,
-      rawData.price ? `Giá: ${rawData.price} ${rawData.currency || ''}` : null,
-      rawData.features.length > 0
-        ? `Tính năng: ${rawData.features.join(', ')}`
-        : null,
-      `URL: ${rawData.productUrl}`,
-    ]
-      .filter(Boolean)
-      .join('\n');
-
-    const prompt = PRODUCT_ANALYSIS_PROMPT.replace(
-      '{PRODUCT_DATA}',
-      productSummary,
-    );
-
-    const resultText = await this.callLlm(provider, apiKey, model, prompt);
-    return this.parseAiResponse(resultText);
-  }
-
-  private async callLlm(
-    provider: string,
-    apiKey: string,
-    model: string,
-    prompt: string,
-  ): Promise<string> {
-    const openAIBaseUrl = (): string => {
-      const urls: Record<string, string> = {
-        groq: 'https://api.groq.com/openai/v1/chat/completions',
-        openai: 'https://api.openai.com/v1/chat/completions',
-        deepseek: 'https://api.deepseek.com/v1/chat/completions',
-        moonshot: 'https://api.moonshot.cn/v1/chat/completions',
-        qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
-        grok: 'https://api.x.ai/v1/chat/completions',
-        volcengine:
-          'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-      };
-      return urls[provider] || '';
-    };
-
-    const defaultModel = (): string => {
-      const models: Record<string, string> = {
-        groq: 'llama-3.3-70b-versatile',
-        openai: 'gpt-4o-mini',
-        deepseek: 'deepseek-chat',
-        moonshot: 'moonshot-v1-8k',
-        qwen: 'qwen-max',
-        azure: 'gpt-35-turbo',
-        grok: 'grok-4.3',
-        volcengine: 'doubao-seed-2-1-turbo-260628',
-      };
-      return models[provider] || '';
-    };
-
-    if (provider === 'gemini') {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 4096,
-          },
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(
-          `Gemini API error ${response.status}: ${await response.text()}`,
-        );
-      }
-      const data = (await response.json()) as GeminiResponse;
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      if (!text) throw new Error('Gemini returned empty response');
-      return text;
-    }
-
-    if (provider === 'azure') {
-      const baseUrl = await this.getAzureBaseUrl();
-      const url = `${baseUrl}/openai/deployments/${model}/chat/completions?api-version=2024-08-01-preview`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'api-key': apiKey,
-        },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.3,
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(
-          `Azure API error ${response.status}: ${await response.text()}`,
-        );
-      }
-      const data = (await response.json()) as OpenAICompatibleResponse;
-      return data.choices?.[0]?.message?.content || '';
-    }
-
-    // OpenAI-compatible providers
-    const url = openAIBaseUrl();
-    if (!url) {
-      throw new Error(`Unsupported LLM provider: ${provider}`);
-    }
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: model || defaultModel(),
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        `${provider} API error ${response.status}: ${await response.text()}`,
-      );
-    }
-    const data = (await response.json()) as OpenAICompatibleResponse;
-    return data.choices?.[0]?.message?.content || '';
-  }
-
-  private async getAzureBaseUrl(): Promise<string> {
-    const setting = await this.prisma.systemSetting.findUnique({
-      where: { key: 'azure_base_url' },
-    });
-    return setting?.value || '';
-  }
-
-  // ---------------------------------------------------------------------------
-  // AI response parsing & validation
-  // ---------------------------------------------------------------------------
-
-  private parseAiResponse(text: string): AiProductAnalysis {
-    // Clean markdown code blocks if present
-    let cleaned = text
-      .replace(/```json\s*/gi, '')
-      .replace(/```\s*/g, '')
-      .trim();
-
-    // Remove think blocks (some models include reasoning)
-    cleaned = cleaned
-      .replace(/<think\b[^>]*>.*?<\/think>/gis, '')
-      .trim();
-
-    // Try to extract JSON object from the text
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      this.logger.warn('AI response does not contain JSON object');
-      return this.emptyAnalysis();
-    }
-
-    try {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return this.validateAnalysis(parsed);
-    } catch (err) {
-      this.logger.warn(
-        `Failed to parse AI JSON response: ${err instanceof Error ? err.message : String(err)}`,
-      );
-      return this.emptyAnalysis();
-    }
-  }
-
-  private validateAnalysis(data: any): AiProductAnalysis {
+  private mapProductToResult(product: any) {
     return {
-      category:
-        typeof data.category === 'string' ? data.category : null,
-      features: this.toStringArray(data.features),
-      benefits: this.toStringArray(data.benefits),
-      usp: this.toStringArray(data.usp),
-      targetAudience: this.toStringArray(data.targetAudience),
-      painPoints: this.toStringArray(data.painPoints),
-      marketingAngles: this.toMarketingAngles(data.marketingAngles),
+      id: product.id,
+      name: product.name,
+      brand: product.brand || null,
+      category: product.category || null,
+      description: product.description || null,
+      price: product.price || null,
+      originalPrice: product.originalPrice || null,
+      currency: product.currency || 'VND',
+      discountPercent: product.discountPercent || null,
+      rating: product.rating || null,
+      reviewCount: product.reviewCount || null,
+      affiliateUrl: product.affiliateUrl,
+      sourceUrl: product.sourceUrl || null,
+      sourcePlatform: product.sourcePlatform || null,
+      images: product.images || [],
+      videos: product.videos || [],
+      features: product.features || [],
+      specifications: product.specifications || null,
+      benefits: product.benefits || [],
+      pros: product.pros || [],
+      cons: product.cons || [],
+      targetAudience: product.targetAudience || null,
+      useCases: product.useCases || [],
+      usp: product.usp || [],
+      painPoints: product.painPoints || [],
+      marketingAngles: product.marketingAngles as MarketingAngle[] | null,
+      contentBrief: product.contentBrief as any,
+      researchStatus: product.researchStatus || null,
+      researchError: product.researchError || null,
+      researchedAt: product.researchedAt || null,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
     };
-  }
-
-  private emptyAnalysis(): AiProductAnalysis {
-    return {
-      category: null,
-      features: [],
-      benefits: [],
-      usp: [],
-      targetAudience: [],
-      painPoints: [],
-      marketingAngles: [],
-    };
-  }
-
-  private toStringArray(value: unknown): string[] {
-    if (!Array.isArray(value)) return [];
-    return value
-      .filter((item) => typeof item === 'string' && item.trim())
-      .map((item) => String(item).trim());
-  }
-
-  private toMarketingAngles(value: unknown): MarketingAngle[] {
-    if (!Array.isArray(value)) return [];
-    return value
-      .filter(
-        (item) =>
-          typeof item === 'object' &&
-          item !== null &&
-          typeof item.title === 'string',
-      )
-      .map((item) => ({
-        title: String(item.title || '').trim(),
-        description: String(item.description || '').trim(),
-        hook: String(item.hook || '').trim(),
-      }));
   }
 }

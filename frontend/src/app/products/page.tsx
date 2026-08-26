@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import Link from "next/link";
@@ -8,47 +8,75 @@ import {
   ShoppingBag,
   Plus,
   Trash2,
-  Edit3,
   Video,
   ExternalLink,
   Sparkles,
   Loader2,
-  DollarSign,
   Tag,
-  Layers,
-  Image as ImageIcon,
   Search,
   Globe,
   CheckCircle2,
   AlertCircle,
-  Target,
-  Zap,
-  Users,
-  TrendingUp,
-  MessageSquare,
   ChevronDown,
   ChevronUp,
   X,
+  Star,
+  Zap,
+  Target,
+  FileText,
+  Clock,
+  Layers,
+  Award,
+  Eye,
+  Edit3,
+  Save,
+  RotateCw,
 } from "lucide-react";
+
+type ProductContentBrief = {
+  product: string;
+  brand?: string | null;
+  targetAudience: string;
+  mainPainPoint: string;
+  mainBenefit: string;
+  sellingPoints: string[];
+  marketingAngle: string;
+  recommendedHook: string;
+  recommendedCTA: string;
+};
 
 type Product = {
   id: string;
   name: string;
+  brand?: string;
+  category?: string;
   description?: string;
   price?: string;
+  originalPrice?: string;
   currency: string;
+  discountPercent?: number;
+  rating?: number;
+  reviewCount?: number;
   affiliateUrl: string;
-  features: string[];
-  benefits: string[];
-  targetAudience?: string;
-  images: string[];
-  createdAt: string;
   sourceUrl?: string;
-  researchStatus?: string;
-  category?: string;
+  sourcePlatform?: string;
+  features: string[];
+  specifications?: Record<string, any>;
+  benefits: string[];
+  pros?: string[];
+  cons?: string[];
+  targetAudience?: string;
+  useCases?: string[];
   usp?: string[];
   painPoints?: string[];
+  images: string[];
+  videos?: string[];
   marketingAngles?: MarketingAngle[];
+  contentBrief?: ProductContentBrief;
+  researchStatus?: string; // pending, processing, completed, failed, partial
+  researchError?: string;
+  researchedAt?: string;
+  createdAt: string;
   _count?: {
     ideas: number;
     jobs: number;
@@ -63,6 +91,7 @@ type MarketingAngle = {
 
 type ResearchResult = {
   success: boolean;
+  jobId?: string;
   product?: Product;
   error?: {
     code: string;
@@ -73,14 +102,17 @@ type ResearchResult = {
 export default function ProductsPage() {
   const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [generatingProductId, setGeneratingProductId] = useState<string | null>(null);
 
   // Research state
   const [researchUrl, setResearchUrl] = useState("");
   const [researchResult, setResearchResult] = useState<ResearchResult | null>(null);
   const [isResearchPanelExpanded, setIsResearchPanelExpanded] = useState(true);
+  const [activeTab, setActiveTab] = useState<"specs" | "ai" | "brief">("ai");
+  const [modalTab, setModalTab] = useState<"view" | "edit">("view");
 
-  // Form State
+  // Manual Form State
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -91,7 +123,10 @@ export default function ProductsPage() {
   const [targetAudience, setTargetAudience] = useState("");
   const [imagesText, setImagesText] = useState("");
 
-  const { data: products = [], isLoading } = useQuery<Product[]>({
+  // Edit Modal Form State
+  const [editForm, setEditForm] = useState<Partial<Product>>({});
+
+  const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["products"],
     queryFn: () => api.get("/products").then((res) => res.data),
   });
@@ -105,16 +140,25 @@ export default function ProductsPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.patch(`/products/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      setSelectedProduct(null);
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/products/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      if (selectedProduct) setSelectedProduct(null);
     },
   });
 
   const researchMutation = useMutation({
     mutationFn: (url: string) =>
-      api.post("/product-research", { url }).then((res) => res.data as ResearchResult),
+      api.post("/products/research", { url }).then((res) => res.data as ResearchResult),
     onSuccess: (data) => {
       setResearchResult(data);
       if (data.success) {
@@ -126,11 +170,39 @@ export default function ProductsPage() {
         success: false,
         error: {
           code: "NETWORK_ERROR",
-          message: error?.response?.data?.message || error?.message || "Lỗi kết nối. Vui lòng thử lại.",
+          message:
+            error?.response?.data?.message || error?.message || "Lỗi kết nối. Vui lòng thử lại.",
         },
       });
     },
   });
+
+  // Poll active research status if in pending/processing state
+  useEffect(() => {
+    if (!researchResult?.product?.id) return;
+    const status = researchResult.product.researchStatus;
+    if (status === "pending" || status === "processing" || status === "RESEARCHING") {
+      const interval = setInterval(async () => {
+        try {
+          const res = await api.get(`/products/${researchResult.product!.id}/research`);
+          if (res.data?.product) {
+            setResearchResult(res.data);
+            if (
+              res.data.product.researchStatus === "completed" ||
+              res.data.product.researchStatus === "partial" ||
+              res.data.product.researchStatus === "failed"
+            ) {
+              queryClient.invalidateQueries({ queryKey: ["products"] });
+              clearInterval(interval);
+            }
+          }
+        } catch (e) {
+          console.error("Polling status failed", e);
+        }
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [researchResult?.product?.id, researchResult?.product?.researchStatus, queryClient]);
 
   const resetForm = () => {
     setName("");
@@ -142,6 +214,32 @@ export default function ProductsPage() {
     setBenefitsText("");
     setTargetAudience("");
     setImagesText("");
+  };
+
+  const handleOpenDetailModal = (product: Product) => {
+    setSelectedProduct(product);
+    setEditForm({
+      name: product.name,
+      brand: product.brand || "",
+      category: product.category || "",
+      price: product.price || "",
+      description: product.description || "",
+      targetAudience: product.targetAudience || "",
+      features: product.features || [],
+      benefits: product.benefits || [],
+      usp: product.usp || [],
+      painPoints: product.painPoints || [],
+    });
+    setModalTab("view");
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProduct) return;
+    updateMutation.mutate({
+      id: selectedProduct.id,
+      data: editForm,
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -206,6 +304,60 @@ export default function ProductsPage() {
     setResearchResult(null);
   };
 
+  const getDisplayName = (product: Product) => {
+    const isPlaceholder = !product.name || product.name.startsWith("Đang nghiên cứu");
+    if (
+      isPlaceholder &&
+      (product.researchStatus === "completed" ||
+        product.researchStatus === "COMPLETED" ||
+        product.researchStatus === "partial" ||
+        product.researchStatus === "PARTIAL")
+    ) {
+      if (product.contentBrief?.product && product.contentBrief.product !== "Sản phẩm") {
+        return product.contentBrief.product;
+      }
+      if (product.brand) return `Sản phẩm ${product.brand}`;
+      if (product.category) return `Sản phẩm ${product.category}`;
+      if (product.sourcePlatform) return `Sản phẩm (${product.sourcePlatform})`;
+      return "Sản phẩm Chi Tiết";
+    }
+    return product.name;
+  };
+
+  const renderStatusBadge = (status?: string) => {
+    const s = (status || "").toLowerCase();
+    switch (s) {
+      case "completed":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-medium">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Nghiên cứu hoàn tất
+          </span>
+        );
+      case "partial":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-medium">
+            <AlertCircle className="w-3.5 h-3.5" /> Một phần
+          </span>
+        );
+      case "processing":
+      case "researching":
+      case "pending":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/30 text-xs font-medium">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang phân tích...
+          </span>
+        );
+      case "failed":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-medium">
+            <AlertCircle className="w-3.5 h-3.5" /> Thất bại
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
       {/* Header */}
@@ -213,10 +365,10 @@ export default function ProductsPage() {
         <div>
           <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-2">
             <ShoppingBag className="w-6 h-6 text-violet-400" />
-            Sản Phẩm Affiliate
+            Sản Phẩm Affiliate & Research Engine
           </h1>
           <p className="text-sm text-zinc-400 mt-1">
-            Quản lý thông tin sản phẩm bán hàng & tự động sinh Short Video 9:16 bằng AI
+            Nghiên cứu tự động thông tin sản phẩm từ URL và tạo AI Content Brief phục vụ sản xuất Video Short
           </p>
         </div>
         <button
@@ -224,14 +376,14 @@ export default function ProductsPage() {
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-medium text-sm hover:from-violet-500 hover:to-indigo-500 transition-all shadow-lg shadow-violet-500/20"
         >
           <Plus className="w-4 h-4" />
-          Thêm Sản Phẩm Mới
+          Thêm Thủ Công
         </button>
       </div>
 
       {/* ============================================================== */}
-      {/* PRODUCT RESEARCH SECTION */}
+      {/* PRODUCT RESEARCH ENGINE PANEL */}
       {/* ============================================================== */}
-      <div className="bg-gradient-to-br from-zinc-900/80 via-zinc-900/60 to-indigo-950/30 border border-zinc-800/80 rounded-xl overflow-hidden">
+      <div className="bg-gradient-to-br from-zinc-900/90 via-zinc-900/70 to-indigo-950/40 border border-zinc-800/80 rounded-xl overflow-hidden shadow-2xl">
         {/* Research Header */}
         <button
           onClick={() => setIsResearchPanelExpanded(!isResearchPanelExpanded)}
@@ -242,11 +394,14 @@ export default function ProductsPage() {
               <Search className="w-5 h-5 text-white" />
             </div>
             <div className="text-left">
-              <h2 className="text-base font-semibold text-zinc-100">
-                Nghiên Cứu Sản Phẩm từ URL
+              <h2 className="text-base font-semibold text-zinc-100 flex items-center gap-2">
+                Product Research Engine
+                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  AI Layered Extraction
+                </span>
               </h2>
-              <p className="text-xs text-zinc-500">
-                Dán link sản phẩm → AI tự động phân tích & trích xuất thông tin
+              <p className="text-xs text-zinc-400">
+                Nhập Product URL → Tự động thu thập JSON-LD, specs, đánh giá & tạo AI Marketing Strategy
               </p>
             </div>
           </div>
@@ -267,7 +422,7 @@ export default function ProductsPage() {
                   type="url"
                   value={researchUrl}
                   onChange={(e) => setResearchUrl(e.target.value)}
-                  placeholder="https://shopee.vn/product/... hoặc bất kỳ URL sản phẩm nào"
+                  placeholder="https://shopee.vn/product/... hoặc URL sản phẩm bất kỳ"
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-10 pr-10 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/20 transition-all"
                   disabled={researchMutation.isPending}
                 />
@@ -294,605 +449,678 @@ export default function ProductsPage() {
                 ) : (
                   <>
                     <Search className="w-4 h-4" />
-                    Nghiên Cứu
+                    Nghiên Cứu Sản Phẩm
                   </>
                 )}
               </button>
             </form>
 
-            {/* Loading State */}
-            {researchMutation.isPending && (
-              <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-zinc-800/40 border border-zinc-700/50">
-                <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
-                <div>
-                  <p className="text-sm text-zinc-300 font-medium">
-                    Đang nghiên cứu sản phẩm...
-                  </p>
-                  <p className="text-xs text-zinc-500 mt-0.5">
-                    Trích xuất thông tin từ trang web → Phân tích bằng AI → Tạo chiến lược marketing
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Error State */}
+            {/* Error Message */}
             {researchResult && !researchResult.success && (
-              <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-red-950/30 border border-red-800/40">
-                <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm">
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm text-red-300 font-medium">
-                    Nghiên cứu thất bại
-                  </p>
-                  <p className="text-xs text-red-400/80 mt-0.5">
-                    {researchResult.error?.message || "Đã xảy ra lỗi không xác định"}
+                  <p className="font-semibold text-rose-200">Nghiên cứu thất bại</p>
+                  <p className="text-xs text-rose-300/80 mt-1">
+                    {researchResult.error?.message || "Không thể tải trang sản phẩm."}
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Success: Research Results */}
+            {/* Research Result Detailed Breakdown */}
             {researchResult?.success && researchResult.product && (
-              <ResearchResultPanel
-                product={researchResult.product}
-                onGenerateVideo={handleGenerateVideo}
-                generatingProductId={generatingProductId}
-              />
+              <div className="space-y-6 pt-2">
+                {/* Product Overview Card */}
+                <div className="flex flex-col md:flex-row gap-6 p-5 rounded-xl bg-zinc-950/80 border border-zinc-800">
+                  {/* Image */}
+                  <div className="w-full md:w-48 h-48 rounded-lg overflow-hidden bg-zinc-900 shrink-0 relative">
+                    {researchResult.product.images?.[0] ? (
+                      <img
+                        src={researchResult.product.images[0]}
+                        alt={researchResult.product.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-zinc-600">
+                        <ShoppingBag className="w-12 h-12" />
+                      </div>
+                    )}
+                    {researchResult.product.sourcePlatform && (
+                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur-md text-[10px] text-zinc-300 uppercase tracking-wider font-semibold border border-zinc-700">
+                        {researchResult.product.sourcePlatform}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          {renderStatusBadge(researchResult.product.researchStatus)}
+                          {researchResult.product.brand && (
+                            <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                              {researchResult.product.brand}
+                            </span>
+                          )}
+                          {researchResult.product.category && (
+                            <span className="text-xs text-zinc-400">
+                              • {researchResult.product.category}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-lg font-bold text-zinc-100 mt-1">
+                          {getDisplayName(researchResult.product)}
+                        </h3>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleOpenDetailModal(researchResult.product!)}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition-all"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Xem / Sửa Chi Tiết
+                        </button>
+                        <button
+                          onClick={() => handleGenerateVideo(researchResult.product!.id)}
+                          disabled={generatingProductId === researchResult.product.id}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shadow-lg shadow-violet-600/20 shrink-0 transition-all"
+                        >
+                          {generatingProductId === researchResult.product.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Video className="w-4 h-4" />
+                          )}
+                          Tạo Video 9:16 Ngay
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-sm">
+                      {researchResult.product.price && (
+                        <span className="text-emerald-400 font-bold text-lg">
+                          {researchResult.product.price} {researchResult.product.currency}
+                        </span>
+                      )}
+                      {researchResult.product.originalPrice && (
+                        <span className="text-zinc-500 line-through text-xs">
+                          {researchResult.product.originalPrice}
+                        </span>
+                      )}
+                      {researchResult.product.discountPercent != null && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold">
+                          -{researchResult.product.discountPercent}%
+                        </span>
+                      )}
+                      {researchResult.product.rating != null && (
+                        <span className="flex items-center gap-1 text-xs text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                          <Star className="w-3 h-3 fill-amber-400" />
+                          {researchResult.product.rating} ({researchResult.product.reviewCount || 0} reviews)
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-zinc-400 line-clamp-2">
+                      {researchResult.product.description}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex border-b border-zinc-800">
+                  <button
+                    onClick={() => setActiveTab("ai")}
+                    className={`px-4 py-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+                      activeTab === "ai"
+                        ? "border-emerald-500 text-emerald-400 bg-emerald-500/5"
+                        : "border-transparent text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    AI Marketing Insights
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("brief")}
+                    className={`px-4 py-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+                      activeTab === "brief"
+                        ? "border-indigo-500 text-indigo-400 bg-indigo-500/5"
+                        : "border-transparent text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    <FileText className="w-4 h-4" />
+                    Product Content Brief
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("specs")}
+                    className={`px-4 py-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+                      activeTab === "specs"
+                        ? "border-violet-500 text-violet-400 bg-violet-500/5"
+                        : "border-transparent text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    <Layers className="w-4 h-4" />
+                    Thông Số & Dữ Liệu Gốc
+                  </button>
+                </div>
+
+                {/* Tab Content: AI Marketing Insights */}
+                {activeTab === "ai" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* USP & Selling Points */}
+                    <div className="p-4 rounded-lg bg-zinc-950/60 border border-zinc-800/80 space-y-2">
+                      <h4 className="text-xs font-bold text-amber-400 flex items-center gap-2 uppercase tracking-wider">
+                        <Award className="w-4 h-4" /> Key Selling Points (USP)
+                      </h4>
+                      <ul className="space-y-1.5">
+                        {(researchResult.product.usp || researchResult.product.features || []).map(
+                          (item, idx) => (
+                            <li key={idx} className="text-xs text-zinc-300 flex items-start gap-2">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                              <span>{item}</span>
+                            </li>
+                          ),
+                        )}
+                      </ul>
+                    </div>
+
+                    {/* Target Audience & Pain Points */}
+                    <div className="p-4 rounded-lg bg-zinc-950/60 border border-zinc-800/80 space-y-2">
+                      <h4 className="text-xs font-bold text-sky-400 flex items-center gap-2 uppercase tracking-wider">
+                        <Target className="w-4 h-4" /> Khách Hàng Mục Tiêu & Pain Points
+                      </h4>
+                      <p className="text-xs text-zinc-300 font-medium">
+                        Audience: {researchResult.product.targetAudience || "Chưa xác định"}
+                      </p>
+                      <div className="space-y-1 pt-1">
+                        <p className="text-[11px] text-zinc-500 uppercase font-semibold">
+                          Pain Points giải quyết:
+                        </p>
+                        {(researchResult.product.painPoints || []).map((point, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-block mr-1.5 mb-1.5 px-2 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20 text-xs"
+                          >
+                            {point}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Marketing Angles */}
+                    <div className="md:col-span-2 p-4 rounded-lg bg-zinc-950/60 border border-zinc-800/80 space-y-3">
+                      <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-2 uppercase tracking-wider">
+                        <Zap className="w-4 h-4" /> Đề Xuất Marketing Angles & Hooks cho Video
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {(researchResult.product.marketingAngles || []).map((angle, idx) => (
+                          <div
+                            key={idx}
+                            className="p-3 rounded bg-zinc-900/80 border border-zinc-800 space-y-1.5"
+                          >
+                            <span className="text-xs font-bold text-emerald-300">
+                              #{idx + 1} {angle.title}
+                            </span>
+                            <p className="text-xs text-zinc-400">{angle.description}</p>
+                            <div className="p-2 rounded bg-emerald-950/30 border border-emerald-500/20 text-xs text-emerald-200 italic">
+                              &quot;{angle.hook}&quot;
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab Content: Product Content Brief */}
+                {activeTab === "brief" && (
+                  <div className="p-5 rounded-xl bg-gradient-to-br from-indigo-950/30 to-zinc-950 border border-indigo-500/30 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-indigo-300 flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-indigo-400" />
+                        AI Reusable Content Brief
+                      </h4>
+                      <span className="text-[11px] text-indigo-400/80 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                        Input for Content Strategy Engine
+                      </span>
+                    </div>
+
+                    {researchResult.product.contentBrief ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        <div className="p-3 rounded bg-zinc-900/60 border border-zinc-800 space-y-1">
+                          <span className="text-zinc-500 font-semibold uppercase text-[10px]">
+                            Target Audience
+                          </span>
+                          <p className="text-zinc-200">
+                            {researchResult.product.contentBrief.targetAudience}
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded bg-zinc-900/60 border border-zinc-800 space-y-1">
+                          <span className="text-zinc-500 font-semibold uppercase text-[10px]">
+                            Main Benefit
+                          </span>
+                          <p className="text-emerald-300">
+                            {researchResult.product.contentBrief.mainBenefit}
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded bg-zinc-900/60 border border-zinc-800 space-y-1">
+                          <span className="text-zinc-500 font-semibold uppercase text-[10px]">
+                            Recommended Hook
+                          </span>
+                          <p className="text-amber-300 font-medium">
+                            &quot;{researchResult.product.contentBrief.recommendedHook}&quot;
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded bg-zinc-900/60 border border-zinc-800 space-y-1">
+                          <span className="text-zinc-500 font-semibold uppercase text-[10px]">
+                            Recommended Call To Action (CTA)
+                          </span>
+                          <p className="text-sky-300 font-medium">
+                            {researchResult.product.contentBrief.recommendedCTA}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-500">Đang khởi tạo Content Brief...</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab Content: Specs */}
+                {activeTab === "specs" && (
+                  <div className="p-4 rounded-lg bg-zinc-950/60 border border-zinc-800 space-y-3">
+                    <h4 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                      Thông Số Kỹ Thuật Chi Tiết
+                    </h4>
+                    {researchResult.product.specifications &&
+                    Object.keys(researchResult.product.specifications).length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        {Object.entries(researchResult.product.specifications).map(
+                          ([k, v], idx) => (
+                            <div
+                              key={idx}
+                              className="flex justify-between p-2 rounded bg-zinc-900/80 border border-zinc-800/60"
+                            >
+                              <span className="text-zinc-400 font-medium">{k}</span>
+                              <span className="text-zinc-200 text-right">{String(v)}</span>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-500">Không có thông số bảng.</p>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Product List Grid */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
-        </div>
-      ) : products.length === 0 ? (
-        <div className="text-center py-16 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/40">
-          <ShoppingBag className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-          <h3 className="text-zinc-300 font-medium">Chưa có sản phẩm nào</h3>
-          <p className="text-zinc-500 text-sm mt-1 max-w-md mx-auto">
-            Hãy thêm sản phẩm đầu tiên để bắt đầu tạo video quảng cáo bán hàng tự động bằng AI.
-          </p>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 text-zinc-200 text-sm hover:bg-zinc-700 transition"
-          >
-            <Plus className="w-4 h-4" /> Thêm Sản Phẩm
-          </button>
-        </div>
-      ) : (
+      {/* ============================================================== */}
+      {/* EXISTING PRODUCT LIST SECTION */}
+      {/* ============================================================== */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
+          Danh Sách Sản Phẩm Đã Lưu
+          <span className="text-xs font-normal text-zinc-500">({products.length})</span>
+        </h2>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.map((product) => (
             <div
               key={product.id}
-              className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-5 hover:border-zinc-700 transition-all flex flex-col justify-between group"
+              className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl overflow-hidden hover:border-zinc-700 transition-all flex flex-col justify-between"
             >
-              <div>
-                {/* Product Image Preview */}
-                <div className="relative w-full h-40 bg-zinc-950 rounded-lg overflow-hidden mb-4 border border-zinc-800 flex items-center justify-center">
-                  {product.images && product.images.length > 0 ? (
+              <div className="p-5 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1 cursor-pointer" onClick={() => handleOpenDetailModal(product)}>
+                    <div className="flex items-center gap-2">
+                      {renderStatusBadge(product.researchStatus)}
+                      {product.brand && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                          {product.brand}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="font-semibold text-zinc-100 text-sm line-clamp-1 hover:text-emerald-400 transition-colors">
+                      {getDisplayName(product)}
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenDetailModal(product)}
+                      className="text-zinc-500 hover:text-zinc-200 p-1 transition-colors"
+                      title="Xem & Chỉnh sửa chi tiết"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => deleteMutation.mutate(product.id)}
+                      className="text-zinc-500 hover:text-rose-400 p-1 transition-colors"
+                      title="Xóa sản phẩm"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {product.images?.[0] && (
+                  <div
+                    className="h-36 rounded-lg bg-zinc-950 overflow-hidden cursor-pointer"
+                    onClick={() => handleOpenDetailModal(product)}
+                  >
                     <img
                       src={product.images[0]}
                       alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                     />
-                  ) : (
-                    <div className="flex flex-col items-center text-zinc-600">
-                      <ImageIcon className="w-8 h-8 mb-1" />
-                      <span className="text-xs">Không có hình ảnh</span>
-                    </div>
-                  )}
-                  {product.price && (
-                    <div className="absolute top-2 right-2 bg-zinc-950/90 backdrop-blur-md px-2.5 py-1 rounded-md border border-zinc-800 text-xs font-bold text-emerald-400">
-                      {product.price} {product.currency}
-                    </div>
-                  )}
-                  {product.researchStatus === "COMPLETED" && (
-                    <div className="absolute top-2 left-2 bg-emerald-950/90 backdrop-blur-md px-2 py-0.5 rounded-md border border-emerald-800/50 text-[10px] font-semibold text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      AI Research
-                    </div>
-                  )}
-                </div>
-
-                {/* Info */}
-                <h3 className="font-semibold text-zinc-100 text-lg line-clamp-1">
-                  {product.name}
-                </h3>
-                {product.category && (
-                  <span className="text-[10px] text-violet-400 bg-violet-950/50 border border-violet-800/30 px-2 py-0.5 rounded-full mt-1 inline-block">
-                    {product.category}
-                  </span>
-                )}
-                {product.description && (
-                  <p className="text-zinc-400 text-xs mt-1 line-clamp-2">
-                    {product.description}
-                  </p>
-                )}
-
-                {/* Features Badges */}
-                {product.features && product.features.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-3">
-                    {product.features.slice(0, 3).map((feat, i) => (
-                      <span
-                        key={i}
-                        className="bg-zinc-800/80 text-zinc-300 text-[11px] px-2 py-0.5 rounded border border-zinc-700/50"
-                      >
-                        {feat}
-                      </span>
-                    ))}
                   </div>
                 )}
+
+                <div className="flex items-center justify-between text-xs">
+                  {product.price ? (
+                    <span className="text-emerald-400 font-bold">
+                      {product.price} {product.currency}
+                    </span>
+                  ) : (
+                    <span className="text-zinc-500">Chưa có giá</span>
+                  )}
+                  {product.affiliateUrl && (
+                    <a
+                      href={product.affiliateUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-violet-400 hover:underline flex items-center gap-1 text-[11px]"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Link
+                    </a>
+                  )}
+                </div>
               </div>
 
-              {/* Action Footer */}
-              <div className="mt-5 pt-4 border-t border-zinc-800/60 flex items-center justify-between gap-2">
-                <a
-                  href={product.affiliateUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-violet-400 hover:underline inline-flex items-center gap-1 line-clamp-1 max-w-[140px]"
+              <div className="px-5 py-3 bg-zinc-950/60 border-t border-zinc-800/80 flex items-center justify-between gap-2">
+                <button
+                  onClick={() => handleOpenDetailModal(product)}
+                  className="text-xs text-zinc-400 hover:text-zinc-200 font-medium flex items-center gap-1"
                 >
-                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                  Affiliate Link
-                </a>
+                  <Eye className="w-3.5 h-3.5" /> Chi Tiết / Sửa
+                </button>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => deleteMutation.mutate(product.id)}
-                    className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-800/60 rounded-lg transition"
-                    title="Xóa sản phẩm"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    onClick={() => handleGenerateVideo(product.id)}
-                    disabled={generatingProductId === product.id}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white font-medium text-xs rounded-lg transition shadow-sm disabled:opacity-50"
-                  >
-                    {generatingProductId === product.id ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-3.5 h-3.5" />
-                    )}
-                    Tạo Video 9:16
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleGenerateVideo(product.id)}
+                  disabled={generatingProductId === product.id}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold transition-all shadow-md shadow-violet-600/20"
+                >
+                  {generatingProductId === product.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Video className="w-3.5 h-3.5" />
+                  )}
+                  Tạo Video 9:16
+                </button>
               </div>
             </div>
           ))}
         </div>
-      )}
+      </div>
 
-      {/* Modal Thêm Sản Phẩm */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
-              <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-                <ShoppingBag className="w-5 h-5 text-violet-400" />
-                Thêm Sản Phẩm Affiliate Mới
-              </h2>
+      {/* ============================================================== */}
+      {/* PRODUCT RESEARCH INSPECT & EDIT MODAL */}
+      {/* ============================================================== */}
+      {selectedProduct && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/80">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-zinc-100 text-base">
+                    {getDisplayName(selectedProduct)}
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    Chi tiết kết quả nghiên cứu sản phẩm & AI Content Brief
+                  </p>
+                </div>
+              </div>
               <button
-                onClick={() => setIsCreateModalOpen(false)}
-                className="text-zinc-500 hover:text-zinc-300"
+                onClick={() => setSelectedProduct(null)}
+                className="text-zinc-500 hover:text-zinc-300 p-1.5 rounded-lg hover:bg-zinc-800 transition-colors"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
-                  Tên sản phẩm <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ví dụ: Nồi chiên không dầu Philips HD9252 4.1L"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-violet-500"
-                />
-              </div>
+            {/* Modal Navigation Tabs */}
+            <div className="flex border-b border-zinc-800 px-6 bg-zinc-950/40">
+              <button
+                onClick={() => setModalTab("view")}
+                className={`px-4 py-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+                  modalTab === "view"
+                    ? "border-emerald-500 text-emerald-400 bg-emerald-500/5"
+                    : "border-transparent text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <Eye className="w-4 h-4" />
+                Xem Kết Quả Phân Tích AI
+              </button>
+              <button
+                onClick={() => setModalTab("edit")}
+                className={`px-4 py-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+                  modalTab === "edit"
+                    ? "border-violet-500 text-violet-400 bg-violet-500/5"
+                    : "border-transparent text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <Edit3 className="w-4 h-4" />
+                Chỉnh Sửa Dữ Liệu
+              </button>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
-                    Giá bán
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ví dụ: 1.890.000"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-violet-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
-                    Đơn vị tiền tệ
-                  </label>
-                  <input
-                    type="text"
-                    value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-violet-500"
-                  />
-                </div>
-              </div>
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              {modalTab === "view" ? (
+                <div className="space-y-6">
+                  {/* General Info Summary */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800">
+                      <span className="text-[10px] text-zinc-500 uppercase font-semibold">Tên sản phẩm</span>
+                      <p className="text-xs text-zinc-200 font-medium mt-1">{getDisplayName(selectedProduct)}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800">
+                      <span className="text-[10px] text-zinc-500 uppercase font-semibold">Thương hiệu / Danh mục</span>
+                      <p className="text-xs text-zinc-200 font-medium mt-1">
+                        {selectedProduct.brand || "—"} / {selectedProduct.category || "—"}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800">
+                      <span className="text-[10px] text-zinc-500 uppercase font-semibold">Giá bán</span>
+                      <p className="text-xs text-emerald-400 font-bold mt-1">
+                        {selectedProduct.price ? `${selectedProduct.price} ${selectedProduct.currency}` : "Chưa cập nhật"}
+                      </p>
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
-                  Link Affiliate (Shopee/TikTok Shop/Lazada){" "}
-                  <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="url"
-                  required
-                  placeholder="https://shope.ee/..."
-                  value={affiliateUrl}
-                  onChange={(e) => setAffiliateUrl(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-violet-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
-                  Mô tả sản phẩm
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Mô tả ngắn gọn về sản phẩm..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-violet-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
-                  Tính năng nổi bật (Mỗi tính năng 1 dòng)
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Công nghệ Rapid Air giảm 90% mỡ thừa&#10;Dung tích 4.1L phù hợp gia đình 3-4 người&#10;Bảng điều khiển cảm ứng 7 chế độ cài sẵn"
-                  value={featuresText}
-                  onChange={(e) => setFeaturesText(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-violet-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
-                  Lợi ích mang lại (Mỗi lợi ích 1 dòng)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Nấu ăn nhanh chóng không lo bắn dầu&#10;Dễ dàng vệ sinh với lòng nồi chống dính"
-                  value={benefitsText}
-                  onChange={(e) => setBenefitsText(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-violet-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
-                  URL Hình ảnh sản phẩm (Mỗi URL 1 dòng)
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"
-                  value={imagesText}
-                  onChange={(e) => setImagesText(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-violet-500 font-mono text-xs"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-sm font-medium hover:bg-zinc-700 transition"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 transition shadow-lg shadow-violet-500/20 disabled:opacity-50"
-                >
-                  {createMutation.isPending && (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                  {/* AI Content Brief Section */}
+                  {selectedProduct.contentBrief && (
+                    <div className="p-4 rounded-xl bg-indigo-950/20 border border-indigo-500/30 space-y-3">
+                      <h4 className="text-xs font-bold text-indigo-300 flex items-center gap-2 uppercase tracking-wider">
+                        <FileText className="w-4 h-4 text-indigo-400" /> Content Brief Cho AI Script
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="p-2.5 rounded bg-zinc-900/60 border border-zinc-800">
+                          <span className="text-zinc-500 text-[10px] block">Khách hàng mục tiêu</span>
+                          <span className="text-zinc-200">{selectedProduct.contentBrief.targetAudience}</span>
+                        </div>
+                        <div className="p-2.5 rounded bg-zinc-900/60 border border-zinc-800">
+                          <span className="text-zinc-500 text-[10px] block">Lợi ích chính</span>
+                          <span className="text-emerald-300">{selectedProduct.contentBrief.mainBenefit}</span>
+                        </div>
+                        <div className="p-2.5 rounded bg-zinc-900/60 border border-zinc-800">
+                          <span className="text-zinc-500 text-[10px] block">Hook Đề Xuất</span>
+                          <span className="text-amber-300 italic">&quot;{selectedProduct.contentBrief.recommendedHook}&quot;</span>
+                        </div>
+                        <div className="p-2.5 rounded bg-zinc-900/60 border border-zinc-800">
+                          <span className="text-zinc-500 text-[10px] block">Call To Action (CTA)</span>
+                          <span className="text-sky-300">{selectedProduct.contentBrief.recommendedCTA}</span>
+                        </div>
+                      </div>
+                    </div>
                   )}
-                  Lưu Sản Phẩm
-                </button>
-              </div>
-            </form>
+
+                  {/* Pain Points & USP */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800 space-y-2">
+                      <h4 className="text-xs font-bold text-amber-400 uppercase">Key Selling Points (USP)</h4>
+                      <ul className="space-y-1">
+                        {(selectedProduct.usp || selectedProduct.features || []).map((u, i) => (
+                          <li key={i} className="text-xs text-zinc-300 flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> {u}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800 space-y-2">
+                      <h4 className="text-xs font-bold text-rose-400 uppercase">Pain Points</h4>
+                      <ul className="space-y-1">
+                        {(selectedProduct.painPoints || []).map((p, i) => (
+                          <li key={i} className="text-xs text-rose-200 flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" /> {p}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Re-Research Action */}
+                  <div className="p-4 rounded-lg bg-zinc-950/80 border border-zinc-800 flex items-center justify-between">
+                    <div>
+                      <h5 className="text-xs font-semibold text-zinc-200">Chạy lại AI Research</h5>
+                      <p className="text-[11px] text-zinc-500">
+                        Nghiên cứu lại từ URL sản phẩm ({selectedProduct.affiliateUrl})
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setResearchUrl(selectedProduct.affiliateUrl);
+                        setSelectedProduct(null);
+                        handleResearch({ preventDefault: () => {} } as any);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md transition-all"
+                    >
+                      <RotateCw className="w-3.5 h-3.5" /> Chạy Lại Research
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Edit Form Tab */
+                <form onSubmit={handleSaveEdit} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">
+                        Tên Sản Phẩm
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.name || ""}
+                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">
+                        Thương Hiệu (Brand)
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.brand || ""}
+                        onChange={(e) => setEditForm({ ...editForm, brand: e.target.value })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">
+                        Danh Mục (Category)
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.category || ""}
+                        onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">
+                        Giá Bán
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.price || ""}
+                        onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">
+                      Mô Tả Sản Phẩm
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={editForm.description || ""}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">
+                      Khách Hàng Mục Tiêu
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.targetAudience || ""}
+                      onChange={(e) => setEditForm({ ...editForm, targetAudience: e.target.value })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
+                    <button
+                      type="button"
+                      onClick={() => setModalTab("view")}
+                      className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={updateMutation.isPending}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shadow-lg shadow-violet-600/20"
+                    >
+                      {updateMutation.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Save className="w-3.5 h-3.5" />
+                      )}
+                      Lưu Thay Đổi
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ============================================================================
-// Research Result Panel — Displays AI-analyzed product data
-// ============================================================================
-
-function ResearchResultPanel({
-  product,
-  onGenerateVideo,
-  generatingProductId,
-}: {
-  product: Product;
-  onGenerateVideo: (id: string) => void;
-  generatingProductId: string | null;
-}) {
-  return (
-    <div className="rounded-xl border border-emerald-800/30 bg-emerald-950/10 overflow-hidden">
-      {/* Success Header */}
-      <div className="flex items-center gap-2 px-5 py-3 bg-emerald-950/30 border-b border-emerald-800/20">
-        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-        <span className="text-sm font-medium text-emerald-300">
-          Nghiên cứu hoàn tất
-        </span>
-      </div>
-
-      <div className="p-5 space-y-5">
-        {/* Product Overview Row */}
-        <div className="flex gap-5">
-          {/* Product Image */}
-          {product.images && product.images.length > 0 && (
-            <div className="w-32 h-32 rounded-lg overflow-hidden border border-zinc-800 flex-shrink-0 bg-zinc-950">
-              <img
-                src={product.images[0]}
-                alt={product.name}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = "none";
-                }}
-              />
-            </div>
-          )}
-
-          {/* Product Info */}
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold text-zinc-100 line-clamp-2">
-              {product.name}
-            </h3>
-            <div className="flex items-center gap-3 mt-2">
-              {product.price && (
-                <span className="text-lg font-bold text-emerald-400">
-                  {product.price} {product.currency}
-                </span>
-              )}
-              {product.category && (
-                <span className="text-xs text-violet-400 bg-violet-950/60 border border-violet-800/30 px-2.5 py-0.5 rounded-full">
-                  {product.category}
-                </span>
-              )}
-            </div>
-            {product.description && (
-              <p className="text-xs text-zinc-400 mt-2 line-clamp-3">
-                {product.description}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Image Gallery */}
-        {product.images && product.images.length > 1 && (
-          <div>
-            <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-              <ImageIcon className="w-3.5 h-3.5" />
-              Hình ảnh sản phẩm ({product.images.length})
-            </h4>
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {product.images.slice(0, 8).map((img, i) => (
-                <div
-                  key={i}
-                  className="w-20 h-20 rounded-lg overflow-hidden border border-zinc-800 flex-shrink-0 bg-zinc-950"
-                >
-                  <img
-                    src={img}
-                    alt={`Product image ${i + 1}`}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = "none";
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Analysis Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Features */}
-          {product.features && product.features.length > 0 && (
-            <AnalysisCard
-              icon={<Zap className="w-4 h-4" />}
-              title="Tính năng nổi bật"
-              items={product.features}
-              color="blue"
-            />
-          )}
-
-          {/* Benefits */}
-          {product.benefits && product.benefits.length > 0 && (
-            <AnalysisCard
-              icon={<CheckCircle2 className="w-4 h-4" />}
-              title="Lợi ích khách hàng"
-              items={product.benefits}
-              color="emerald"
-            />
-          )}
-
-          {/* USP */}
-          {product.usp && product.usp.length > 0 && (
-            <AnalysisCard
-              icon={<Target className="w-4 h-4" />}
-              title="Điểm bán hàng độc đáo (USP)"
-              items={product.usp}
-              color="amber"
-            />
-          )}
-
-          {/* Target Audience */}
-          {product.targetAudience && (
-            <AnalysisCard
-              icon={<Users className="w-4 h-4" />}
-              title="Đối tượng mục tiêu"
-              items={product.targetAudience.split(", ")}
-              color="violet"
-            />
-          )}
-
-          {/* Pain Points */}
-          {product.painPoints && product.painPoints.length > 0 && (
-            <AnalysisCard
-              icon={<AlertCircle className="w-4 h-4" />}
-              title="Vấn đề được giải quyết"
-              items={product.painPoints}
-              color="rose"
-            />
-          )}
-        </div>
-
-        {/* Marketing Angles */}
-        {product.marketingAngles && product.marketingAngles.length > 0 && (
-          <div>
-            <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5" />
-              Góc tiếp cận Marketing ({product.marketingAngles.length})
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {product.marketingAngles.map((angle, i) => (
-                <div
-                  key={i}
-                  className="bg-zinc-900/80 border border-zinc-800/60 rounded-lg p-3.5 space-y-2"
-                >
-                  <h5 className="text-sm font-semibold text-zinc-200">
-                    {angle.title}
-                  </h5>
-                  {angle.description && (
-                    <p className="text-xs text-zinc-400">{angle.description}</p>
-                  )}
-                  {angle.hook && (
-                    <div className="flex items-start gap-2 bg-indigo-950/30 border border-indigo-800/20 rounded-md px-3 py-2">
-                      <MessageSquare className="w-3.5 h-3.5 text-indigo-400 mt-0.5 flex-shrink-0" />
-                      <p className="text-xs text-indigo-300 italic">
-                        &ldquo;{angle.hook}&rdquo;
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3 pt-3 border-t border-zinc-800/40">
-          <button
-            onClick={() => onGenerateVideo(product.id)}
-            disabled={generatingProductId === product.id}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-medium text-sm hover:from-violet-500 hover:to-indigo-500 transition-all shadow-lg shadow-violet-500/20 disabled:opacity-50"
-          >
-            {generatingProductId === product.id ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Sparkles className="w-4 h-4" />
-            )}
-            Tạo Video 9:16 từ sản phẩm này
-          </button>
-          <a
-            href={product.affiliateUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-zinc-800 text-zinc-300 text-sm hover:bg-zinc-700 transition"
-          >
-            <ExternalLink className="w-4 h-4" />
-            Xem sản phẩm
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// Analysis Card — Reusable component for feature/benefit/USP lists
-// ============================================================================
-
-const colorMap: Record<string, { bg: string; border: string; icon: string; badge: string }> = {
-  blue: {
-    bg: "bg-blue-950/20",
-    border: "border-blue-800/30",
-    icon: "text-blue-400",
-    badge: "bg-blue-950/40 text-blue-300 border-blue-800/30",
-  },
-  emerald: {
-    bg: "bg-emerald-950/20",
-    border: "border-emerald-800/30",
-    icon: "text-emerald-400",
-    badge: "bg-emerald-950/40 text-emerald-300 border-emerald-800/30",
-  },
-  amber: {
-    bg: "bg-amber-950/20",
-    border: "border-amber-800/30",
-    icon: "text-amber-400",
-    badge: "bg-amber-950/40 text-amber-300 border-amber-800/30",
-  },
-  violet: {
-    bg: "bg-violet-950/20",
-    border: "border-violet-800/30",
-    icon: "text-violet-400",
-    badge: "bg-violet-950/40 text-violet-300 border-violet-800/30",
-  },
-  rose: {
-    bg: "bg-rose-950/20",
-    border: "border-rose-800/30",
-    icon: "text-rose-400",
-    badge: "bg-rose-950/40 text-rose-300 border-rose-800/30",
-  },
-};
-
-function AnalysisCard({
-  icon,
-  title,
-  items,
-  color,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  items: string[];
-  color: string;
-}) {
-  const colors = colorMap[color] || colorMap.blue;
-  return (
-    <div className={`${colors.bg} ${colors.border} border rounded-lg p-3.5`}>
-      <h4 className={`text-xs font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5 ${colors.icon}`}>
-        {icon}
-        {title}
-      </h4>
-      <div className="flex flex-wrap gap-1.5">
-        {items.map((item, i) => (
-          <span
-            key={i}
-            className={`text-[11px] px-2 py-0.5 rounded border ${colors.badge}`}
-          >
-            {item}
-          </span>
-        ))}
-      </div>
     </div>
   );
 }

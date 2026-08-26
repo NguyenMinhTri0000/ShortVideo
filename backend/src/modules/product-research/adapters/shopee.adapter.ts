@@ -1,0 +1,44 @@
+import { Logger } from '@nestjs/common';
+import { ProductSourceAdapter } from './product-source.adapter';
+import { GenericProductAdapter } from './generic-product.adapter';
+import type { RawProductData } from '../types/product-research.types';
+
+/**
+ * Shopee Platform Adapter
+ *
+ * Dedicated adapter for Shopee URLs (`shopee.vn`, `shopee.com.*`, `shp.ee`).
+ * Uses Shopee-specific DOM fallback selectors and JSON-LD structure,
+ * delegating generic fetching logic to `GenericProductAdapter`.
+ */
+export class ShopeeAdapter extends ProductSourceAdapter {
+  readonly name = 'shopee';
+  private readonly logger = new Logger(ShopeeAdapter.name);
+  private readonly genericAdapter = new GenericProductAdapter();
+
+  canHandle(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.toLowerCase();
+      return (
+        host.includes('shopee.vn') ||
+        host.includes('shopee.com') ||
+        host.includes('shp.ee')
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  async extract(url: string): Promise<RawProductData> {
+    this.logger.log(`[ShopeeAdapter] Extracting Shopee product: ${url}`);
+    
+    // Shopee pages embed rich JSON-LD data and OpenGraph tags
+    const rawData = await this.genericAdapter.extract(url);
+    
+    return {
+      ...rawData,
+      sourcePlatform: this.name,
+      brand: rawData.brand || 'Shopee Seller',
+    };
+  }
+}

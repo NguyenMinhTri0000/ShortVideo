@@ -27,27 +27,39 @@ model Idea {
 }
 
 model Product {
-  id             String   @id @default(uuid())
-  name           String
-  description    String?
-  price          String?
-  currency       String   @default("VND")
-  affiliateUrl   String
-  features       String[] @default([])
-  benefits       String[] @default([])
-  targetAudience String?
-  images         String[] @default([])
-  sourceUrl        String?
-  researchStatus   String?
-  researchedAt     DateTime?
-  category         String?
-  usp              String[] @default([])
-  painPoints       String[] @default([])
-  marketingAngles  Json?
-  researchRawData  Json?
-  researchError    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String    @id @default(uuid())
+  name            String
+  brand           String?
+  category        String?
+  description     String?
+  price           String?
+  originalPrice   String?
+  currency        String    @default("VND")
+  discountPercent Float?
+  rating          Float?
+  reviewCount     Int?
+  affiliateUrl    String
+  sourceUrl       String?
+  sourcePlatform  String?   @default("generic")
+  images          String[]  @default([])
+  videos          String[]  @default([])
+  features        String[]  @default([])
+  specifications  Json?
+  benefits        String[]  @default([])
+  pros            String[]  @default([])
+  cons            String[]  @default([])
+  targetAudience  String?
+  useCases        String[]  @default([])
+  usp             String[]  @default([])
+  painPoints      String[]  @default([])
+  marketingAngles Json?
+  contentBrief    Json?
+  researchRawData Json?
+  researchStatus  String?   // pending, processing, completed, failed, partial
+  researchError   String?
+  researchedAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   ideas Idea[]
   jobs  GenerationJob[]
