@@ -18,6 +18,7 @@ import type {
   MarketingAngle,
 } from './types/product-research.types';
 import { ResearchStatus } from './types/product-research.types';
+import { AssetDiscoveryService } from './asset-discovery.service';
 
 @Injectable()
 export class ProductResearchService {
@@ -28,6 +29,7 @@ export class ProductResearchService {
     private prisma: PrismaService,
     private productAnalysisService: ProductAnalysisService,
     private contentBriefService: ContentBriefService,
+    private assetDiscoveryService: AssetDiscoveryService,
     @InjectQueue('product-research')
     private researchQueue?: Queue<ProductResearchJobPayload>,
   ) {
@@ -230,6 +232,11 @@ export class ProductResearchService {
       this.logger.log(
         `[Database] Product saved successfully: id=${updatedProduct.id}, status=${finalStatus}`,
       );
+
+      // Trigger Automatic Product Asset Discovery asynchronously
+      this.assetDiscoveryService.discoverAndImportAssets(updatedProduct.id).catch((err) => {
+        this.logger.error(`[AssetDiscovery] Automatic asset discovery error: ${err}`);
+      });
 
       return {
         success: true,

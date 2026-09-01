@@ -8,6 +8,8 @@ import { ProductResearchProcessor } from './product-research.processor';
 import { LlmModule } from '../llm/llm.module';
 import { DatabaseModule } from '../database/database.module';
 
+import { AssetDiscoveryService } from './asset-discovery.service';
+
 @Module({
   imports: [
     DatabaseModule,
@@ -22,7 +24,13 @@ import { DatabaseModule } from '../database/database.module';
     ProductAnalysisService,
     ContentBriefService,
     ProductResearchProcessor,
+    AssetDiscoveryService,
   ],
-  exports: [ProductResearchService, ProductAnalysisService, ContentBriefService],
+  exports: [
+    ProductResearchService,
+    ProductAnalysisService,
+    ContentBriefService,
+    AssetDiscoveryService,
+  ],
 })
 export class ProductResearchModule {}

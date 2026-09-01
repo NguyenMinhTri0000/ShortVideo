@@ -9,6 +9,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ProductResearchService } from './product-research.service';
+import { AssetDiscoveryService, type AssetDiscoveryResult } from './asset-discovery.service';
 import { ResearchProductDto } from './dto/research-product.dto';
 import type { ProductResearchResult } from './types/product-research.types';
 
@@ -18,6 +19,7 @@ export class ProductResearchController {
 
   constructor(
     private readonly productResearchService: ProductResearchService,
+    private readonly assetDiscoveryService: AssetDiscoveryService,
   ) {}
 
   @Post('products/research')
@@ -44,5 +46,14 @@ export class ProductResearchController {
   ): Promise<ProductResearchResult> {
     this.logger.log(`GET /products/${id}/research`);
     return this.productResearchService.getProductResearchStatus(id);
+  }
+
+  @Post('products/:id/discover-assets')
+  @HttpCode(HttpStatus.OK)
+  async discoverAssets(
+    @Param('id') id: string,
+  ): Promise<AssetDiscoveryResult> {
+    this.logger.log(`POST /products/${id}/discover-assets`);
+    return this.assetDiscoveryService.discoverAndImportAssets(id);
   }
 }

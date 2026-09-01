@@ -62,8 +62,8 @@ export class GenericProductAdapter extends ProductSourceAdapter {
     // Layer 3: Standard Meta & Microdata
     const meta = this.extractHtmlMeta($);
 
-    // Layer 4: HTML DOM details (prices, ratings, specs)
-    const domData = this.extractDomData($);
+    // Layer 4: HTML DOM details (prices, ratings, specs, gallery)
+    const domData = this.extractDomData($, url);
 
     // Normalize & merge data in priority order
     const title = jsonLd.name || og.title || meta.title || domData.title || null;
@@ -333,12 +333,20 @@ export class GenericProductAdapter extends ProductSourceAdapter {
   // ---------------------------------------------------------------------------
 
   private extractOpenGraph($: cheerio.CheerioAPI) {
+    const ogImages: string[] = [];
+    $(
+      'meta[property="og:image"], meta[property="og:image:url"], meta[property="og:image:secure_url"], meta[name="twitter:image"], meta[name="image"]',
+    ).each((_, el) => {
+      const content = $(el).attr('content')?.trim();
+      if (content) ogImages.push(content);
+    });
+
     return {
       title: $('meta[property="og:title"]').attr('content')?.trim() || null,
       brand: $('meta[property="product:brand"]').attr('content')?.trim() || null,
       category: $('meta[property="product:category"]').attr('content')?.trim() || null,
       description: $('meta[property="og:description"]').attr('content')?.trim() || null,
-      image: $('meta[property="og:image"]').attr('content')?.trim() || null,
+      image: ogImages,
       video: $('meta[property="og:video"]').attr('content')?.trim() || null,
       price: $('meta[property="product:price:amount"]').attr('content')?.trim() || null,
       currency: $('meta[property="product:price:currency"]').attr('content')?.trim() || null,
@@ -356,9 +364,11 @@ export class GenericProductAdapter extends ProductSourceAdapter {
     const category = $('meta[name="category"]').attr('content')?.trim() || null;
 
     const images: string[] = [];
-    $('img[src*="product"], img[src*="item"]').each((_, el) => {
-      const src = $(el).attr('src') || $(el).attr('data-src');
-      if (src && src.startsWith('http')) images.push(src);
+    $(
+      'img[src*="product"], img[src*="item"], img[src*="gallery"], img[data-src*="product"], img[data-src*="item"]',
+    ).each((_, el) => {
+      const src = $(el).attr('src') || $(el).attr('data-src') || $(el).attr('data-lazy-src');
+      if (src) images.push(src);
     });
 
     const features: string[] = [];
@@ -371,10 +381,10 @@ export class GenericProductAdapter extends ProductSourceAdapter {
   }
 
   // ---------------------------------------------------------------------------
-  // HTML DOM fallbacks
+  // HTML DOM fallbacks & Rich Gallery Extraction
   // ---------------------------------------------------------------------------
 
-  private extractDomData($: cheerio.CheerioAPI) {
+  private extractDomData($: cheerio.CheerioAPI, baseUrl?: string) {
     const title =
       $('h1.product-title, h1.product-name, h1[itemprop="name"], h1').first().text()?.trim() ||
       null;
@@ -444,16 +454,96 @@ export class GenericProductAdapter extends ProductSourceAdapter {
       }
     });
 
-    const images: string[] = [];
-    $('.product-gallery img, .product-images img, img[itemprop="image"]').each((_, el) => {
-      const src = $(el).attr('src') || $(el).attr('data-src') || $(el).attr('data-zoom-image');
-      if (src && src.startsWith('http')) images.push(src);
+    const rawCandidateUrls: string[] = [];
+
+    // 1. Target Product Gallery Elements
+    const gallerySelectors = [
+      '.product-gallery img',
+      '.product-images img',
+      '.gallery img',
+      '.carousel img',
+      '.slider img',
+      '.swiper-slide img',
+      '.slick-slide img',
+      '[class*="gallery"] img',
+      '[class*="carousel"] img',
+      '[class*="thumb"] img',
+      '[class*="product"] img',
+      '[class*="image"] img',
+      'img[itemprop="image"]',
+      'img[data-src]',
+      'img[data-lazy]',
+      'img[srcset]',
+      'img',
+    ];
+
+    $(gallerySelectors.join(', ')).each((_, el) => {
+      const attributes = [
+        $(el).attr('data-zoom-image'),
+        $(el).attr('data-large_image'),
+        $(el).attr('data-large-image'),
+        $(el).attr('data-high-res-src'),
+        $(el).attr('data-original'),
+        $(el).attr('data-src'),
+        $(el).attr('data-lazy-src'),
+        $(el).attr('data-lazy'),
+        $(el).attr('src'),
+      ];
+
+      for (const attr of attributes) {
+        if (attr) rawCandidateUrls.push(attr);
+      }
+
+      // Handle srcset / data-srcset
+      const srcset = $(el).attr('srcset') || $(el).attr('data-srcset');
+      if (srcset) {
+        const parts = srcset.split(',');
+        for (const part of parts) {
+          const u = part.trim().split(/\s+/)[0];
+          if (u) rawCandidateUrls.push(u);
+        }
+      }
     });
 
+    // 2. Inline Page Scripts (State / JSON variables & E-commerce CDNs)
+    $('script').each((_, el) => {
+      const scriptText = $(el).html();
+      if (!scriptText || scriptText.length > 500000) return;
+
+      // Standard image extension matches
+      const stdMatches = scriptText.match(/https?:\/\/[^"'\s\\]+?\.(?:jpg|jpeg|png|webp)/gi);
+      if (stdMatches) {
+        for (const m of stdMatches) {
+          rawCandidateUrls.push(m);
+        }
+      }
+
+      // E-commerce CDN matches (Shopee, Lazada, TikTok Shop, AliExpress, etc.)
+      const cdnMatches = scriptText.match(
+        /https?:\/\/[^"'\s\\]*?(?:susercontent\.com\/file|ibyteimg\.com|alicdn\.com|cdnm-shopline|shopify\.com)\/[a-zA-Z0-9_\/-]+/gi,
+      );
+      if (cdnMatches) {
+        for (const m of cdnMatches) {
+          rawCandidateUrls.push(m);
+        }
+      }
+    });
+
+    // Resolve & Clean URLs
+    const images: string[] = [];
+    for (const raw of rawCandidateUrls) {
+      const resolved = this.resolveAndUpgradeImageUrl(raw, baseUrl);
+      if (resolved) images.push(resolved);
+    }
+
+    // Videos
     const videos: string[] = [];
-    $('video source, iframe[src*="youtube"]').each((_, el) => {
+    $('video source, video, iframe[src*="youtube"], iframe[src*="vimeo"]').each((_, el) => {
       const src = $(el).attr('src');
-      if (src) videos.push(src);
+      if (src) {
+        const resolvedVid = this.resolveUrl(src, baseUrl);
+        if (resolvedVid) videos.push(resolvedVid);
+      }
     });
 
     return {
@@ -470,6 +560,65 @@ export class GenericProductAdapter extends ProductSourceAdapter {
       images,
       videos,
     };
+  }
+
+  private resolveAndUpgradeImageUrl(raw: string, baseUrl?: string): string | null {
+    if (!raw || typeof raw !== 'string') return null;
+    let urlStr = raw.trim();
+    if (urlStr.startsWith('//')) urlStr = 'https:' + urlStr;
+
+    let absolute: string;
+    try {
+      if (baseUrl && !urlStr.startsWith('http://') && !urlStr.startsWith('https://')) {
+        absolute = new URL(urlStr, baseUrl).href;
+      } else {
+        absolute = new URL(urlStr).href;
+      }
+    } catch {
+      return null;
+    }
+
+    const lower = absolute.toLowerCase();
+    if (lower.includes('data:image/') || lower.includes('.svg') || lower.endsWith('.gif')) {
+      return null;
+    }
+    if (
+      lower.includes('favicon') ||
+      lower.includes('logo') ||
+      lower.includes('avatar') ||
+      lower.includes('icon') ||
+      lower.includes('sprite') ||
+      lower.includes('shopeemobile.com')
+    ) {
+      return null;
+    }
+
+    // Clean @resize_... parameters
+    absolute = absolute.replace(/@resize_[^?#]+/i, '');
+
+    // Upgrade known thumbnail resolutions to full resolution
+    // Shopee thumbnails (_tn, _cover, _100x100, etc. with or without extension)
+    absolute = absolute.replace(
+      /_(tn|cover|100x100|60x60|80x80|200x200)(\.[a-z]+)?$/i,
+      (_, __, g2) => g2 || '',
+    );
+    // Lazada thumbnails (_80x80q80.jpg)
+    absolute = absolute.replace(/_\d+x\d+q\d+\.[a-z]+$/i, '');
+    // Amazon thumbnails (._AC_US40_, etc.)
+    absolute = absolute.replace(/\._[A-Z0-9_]+_(\.[a-z]+)?$/i, (_, g1) => g1 || '');
+
+    return absolute;
+  }
+
+  private resolveUrl(raw: string, baseUrl?: string): string | null {
+    if (!raw || typeof raw !== 'string') return null;
+    let u = raw.trim();
+    if (u.startsWith('//')) u = 'https:' + u;
+    try {
+      return baseUrl && !u.startsWith('http') ? new URL(u, baseUrl).href : new URL(u).href;
+    } catch {
+      return null;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -525,15 +674,15 @@ export class GenericProductAdapter extends ProductSourceAdapter {
       const urls = Array.isArray(item) ? item : [item];
       for (const raw of urls) {
         if (typeof raw !== 'string') continue;
-        const cleaned = raw.trim();
-        if (cleaned && cleaned.startsWith('http') && !seen.has(cleaned)) {
+        const cleaned = this.resolveAndUpgradeImageUrl(raw);
+        if (cleaned && !seen.has(cleaned)) {
           seen.add(cleaned);
           result.push(cleaned);
         }
       }
     }
 
-    return result.slice(0, 15);
+    return result.slice(0, 30);
   }
 
   private mergeVideos(...lists: (string | string[] | null | undefined)[]): string[] {
@@ -553,7 +702,7 @@ export class GenericProductAdapter extends ProductSourceAdapter {
       }
     }
 
-    return result.slice(0, 5);
+    return result.slice(0, 10);
   }
 
   private cleanPriceString(str: string): string {

@@ -194,6 +194,7 @@ export default function ProductsPage() {
   const [newImageUrlInput, setNewImageUrlInput] = useState("");
   const [newVideoUrlInput, setNewVideoUrlInput] = useState("");
   const [isUploadingAsset, setIsUploadingAsset] = useState(false);
+  const [isDiscoveringAssets, setIsDiscoveringAssets] = useState(false);
 
   const handleUploadAssetFile = async (e: React.ChangeEvent<HTMLInputElement>, type: "image" | "video") => {
     const file = e.target.files?.[0];
@@ -202,7 +203,7 @@ export default function ProductsPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await api.post("/upload", formData, {
+      const res = await api.post("/products/assets/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       const url = res.data.url;
@@ -211,11 +212,36 @@ export default function ProductsPage() {
       } else {
         setEditForm((prev) => ({ ...prev, videos: [...(prev.videos || []), url] }));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to upload asset file:", err);
+      alert("Lỗi tải file: " + (err.response?.data?.message || err.message));
     } finally {
       setIsUploadingAsset(false);
       e.target.value = "";
+    }
+  };
+
+  const handleDiscoverAssets = async () => {
+    if (!selectedProduct) return;
+    try {
+      setIsDiscoveringAssets(true);
+      const res = await api.post(`/products/${selectedProduct.id}/discover-assets`);
+      if (res.data?.success) {
+        alert(res.data.message || `Đã tìm thấy ${res.data.importedCount} ảnh sản phẩm mới!`);
+        queryClient.invalidateQueries({ queryKey: ["products"] });
+        if (res.data.newImages && res.data.newImages.length > 0) {
+          setEditForm((prev) => ({
+            ...prev,
+            images: [...(prev.images || []), ...res.data.newImages],
+          }));
+        }
+      } else {
+        alert("Thông báo: " + (res.data?.message || "Không tìm thấy ảnh mới phù hợp."));
+      }
+    } catch (err: any) {
+      alert("Lỗi tìm kiếm ảnh sản phẩm: " + (err.response?.data?.message || err.message));
+    } finally {
+      setIsDiscoveringAssets(false);
     }
   };
 
@@ -1584,6 +1610,20 @@ export default function ProductsPage() {
                               onChange={(e) => handleUploadAssetFile(e, "image")}
                             />
                           </label>
+
+                          <button
+                            type="button"
+                            onClick={handleDiscoverAssets}
+                            disabled={isDiscoveringAssets}
+                            className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-semibold shrink-0 transition-all shadow-sm"
+                          >
+                            {isDiscoveringAssets ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                            ) : (
+                              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                            )}
+                            Tự Động Tìm Thêm Ảnh (AI Discovery)
+                          </button>
                           <div className="flex-1 flex gap-2">
                             <div className="relative flex-1">
                               <Link2 className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
