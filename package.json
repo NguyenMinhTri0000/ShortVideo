@@ -1,0 +1,19 @@
+{
+  "name": "short-video-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Short Video SaaS Monorepo",
+  "scripts": {
+    "dev:backend": "cd backend && npm run start:dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "test:engine": "cd engine && pytest test/",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:frontend": "cd frontend && npm run lint"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ]
+}

@@ -1,5 +1,7 @@
-import { Controller, Get, Post, Param } from '@nestjs/common';
+import { Controller, Get, Post, Param, Sse, MessageEvent } from '@nestjs/common';
 import { JobsService } from './jobs.service';
+import { Observable, interval } from 'rxjs';
+import { map, switchMap } from 'rxjs/operators';
 
 @Controller('jobs')
 export class JobsController {
@@ -13,6 +15,23 @@ export class JobsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.jobsService.findOne(id);
+  }
+
+  @Sse(':id/progress')
+  streamProgress(@Param('id') id: string): Observable<MessageEvent> {
+    return interval(2000).pipe(
+      switchMap(async () => {
+        const job = await this.jobsService.findOne(id);
+        return {
+          data: {
+            id: job?.id,
+            status: job?.status,
+            progress: job?.progress,
+            errorMessage: job?.errorMessage,
+          },
+        } as MessageEvent;
+      }),
+    );
   }
 
   @Get(':id/logs')
@@ -30,3 +49,4 @@ export class JobsController {
     return this.jobsService.retry(id);
   }
 }
+

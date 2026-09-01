@@ -175,11 +175,36 @@ export class VideoProcessor extends WorkerHost {
       args.push('--stroke-width', config.stroke_width.toString());
     }
 
+function getPythonRunner(projectRoot: string, cliArgs: string[]) {
+  try {
+    const { execSync } = require('child_process');
+    execSync('uv --version', { stdio: 'ignore' });
+    return {
+      cmd: 'uv',
+      args: ['run', '--project', 'engine', 'python', ...cliArgs],
+    };
+  } catch {
+    const venvPython = path.join(projectRoot, 'engine', '.venv', 'bin', 'python');
+    if (fs.existsSync(venvPython)) {
+      return {
+        cmd: venvPython,
+        args: cliArgs,
+      };
+    }
+    return {
+      cmd: 'python3',
+      args: cliArgs,
+    };
+  }
+}
+
+    const runner = getPythonRunner(projectRoot, args);
     this.logger.log(
-      `Executing: uv run --project engine python ${args.join(' ')}`,
+      `Executing engine: ${runner.cmd} ${runner.args.join(' ')}`,
     );
 
     return new Promise((resolve, reject) => {
+
       let pyProcess: ChildProcessWithoutNullStreams | null = null;
       let logQueue: Promise<void> = Promise.resolve();
       let settled = false;
@@ -296,8 +321,8 @@ export class VideoProcessor extends WorkerHost {
       };
 
       pyProcess = spawn(
-        'uv',
-        ['run', '--project', 'engine', 'python', ...args],
+        runner.cmd,
+        runner.args,
         {
           cwd: projectRoot,
           env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
