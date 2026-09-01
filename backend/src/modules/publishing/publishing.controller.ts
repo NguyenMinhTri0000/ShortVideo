@@ -14,7 +14,7 @@ import type { Response } from 'express';
 import { PublishingService, CreateAccountDto, CreatePublishJobDto } from './publishing.service';
 import { PlatformType } from './adapters/platform-adapter.interface';
 
-@Controller('api/publishing')
+@Controller('publishing')
 export class PublishingController {
   constructor(private readonly publishingService: PublishingService) {}
 
@@ -41,7 +41,9 @@ export class PublishingController {
     @Query('redirectUri') redirectUri: string,
   ) {
     const plat = platform.toUpperCase() as PlatformType;
-    return this.publishingService.getOAuthUrl(plat, redirectUri || 'http://localhost:23000/publishing/callback');
+    const baseUrl = process.env.OAUTH_REDIRECT_BASE_URL || process.env.CORS_ORIGIN || 'http://localhost:23000';
+    const defaultRedirect = `${baseUrl}/api/publishing/accounts/${platform.toLowerCase()}/callback`;
+    return this.publishingService.getOAuthUrl(plat, redirectUri || defaultRedirect);
   }
 
   @Get('accounts/:platform/callback')
@@ -51,13 +53,20 @@ export class PublishingController {
     @Query('redirectUri') redirectUri: string,
     @Res() res: Response,
   ) {
-    const plat = platform.toUpperCase() as PlatformType;
-    const account = await this.publishingService.handleOAuthCallback(
-      plat,
-      code,
-      redirectUri || 'http://localhost:23000/publishing/callback',
-    );
-    return res.redirect(`/publishing?accountConnected=${account.id}`);
+    try {
+      const plat = platform.toUpperCase() as PlatformType;
+      const baseUrl = process.env.OAUTH_REDIRECT_BASE_URL || process.env.CORS_ORIGIN || 'http://localhost:23000';
+      const defaultRedirect = `${baseUrl}/api/publishing/accounts/${platform.toLowerCase()}/callback`;
+      const account = await this.publishingService.handleOAuthCallback(
+        plat,
+        code,
+        redirectUri || defaultRedirect,
+      );
+      return res.redirect(`http://localhost:23000/publishing?accountConnected=${account.id}`);
+    } catch (err: any) {
+      const errorMessage = encodeURIComponent(err.message || 'OAuth authorization failed.');
+      return res.redirect(`http://localhost:23000/publishing?error=${errorMessage}`);
+    }
   }
 
   // --- PUBLISHING JOBS ---

@@ -118,7 +118,7 @@ export class VideoProcessor extends WorkerHost {
     if (language) {
       args.push('--video-language', language);
     }
-    const settings = await this.settingsService.getSettings();
+    const settings: Record<string, any> = await this.settingsService.getSettings();
     const effectiveVoiceName =
       config.voice_name && config.voice_name.trim()
         ? config.voice_name

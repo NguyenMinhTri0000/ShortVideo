@@ -265,6 +265,7 @@ export default function Ideas() {
       topic: string;
       language: string;
       existingTitles?: string[];
+      autoGenerateScript?: boolean;
     }) => api.post("/ideas/brainstorm", payload).then((res) => res.data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["ideas"] });

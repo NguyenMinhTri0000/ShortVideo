@@ -60,6 +60,8 @@ services:
       MINIO_SECRET_KEY: "minioadmin"
       MINIO_BUCKET_NAME: "videos"
       PORT: 23001
+      YOUTUBE_CLIENT_ID: ""
+      YOUTUBE_CLIENT_SECRET: ""
     volumes:
       - ./engine:/app/engine
       - ./storage:/app/storage

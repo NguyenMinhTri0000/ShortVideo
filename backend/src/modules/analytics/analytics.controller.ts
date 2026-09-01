@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { AnalyticsService, AnalyticsFilterDto } from './analytics.service';
 
-@Controller('api/analytics')
+@Controller('analytics')
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 

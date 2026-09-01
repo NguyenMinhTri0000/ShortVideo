@@ -176,6 +176,9 @@ export class PublishingService {
 
   async getOAuthUrl(platform: PlatformType, redirectUri: string) {
     const adapter = this.getAdapter(platform);
+    if (!adapter.isConfigured()) {
+      throw new BadRequestException(`API credentials for ${platform} are not configured in backend.`);
+    }
     if (!adapter.getAuthUrl) {
       throw new BadRequestException(`OAuth not supported for ${platform}`);
     }

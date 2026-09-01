@@ -107,6 +107,19 @@ export default function PublishingDashboard() {
 
   useEffect(() => {
     fetchData();
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const connectedId = params.get("accountConnected");
+      const errorParam = params.get("error");
+      if (connectedId) {
+        setActionMessage({ type: "success", text: "Platform account connected successfully via OAuth!" });
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (errorParam) {
+        setActionMessage({ type: "error", text: decodeURIComponent(errorParam) });
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
   }, []);
 
   const handleVideoSelect = (vidId: string) => {
@@ -139,15 +152,8 @@ export default function PublishingDashboard() {
     }
 
     setSubmitting(true);
-    setActionMessage(null);
-
-    const parsedHashtags = hashtags
-      .split(/[\s,]+/)
-      .map((tag) => tag.trim())
-      .filter(Boolean);
-
     let successCount = 0;
-    let errorMsgs: string[] = [];
+    const errorMsgs: string[] = [];
 
     for (const accId of selectedAccounts) {
       try {
@@ -156,9 +162,9 @@ export default function PublishingDashboard() {
           platformAccountId: accId,
           title,
           caption,
-          hashtags: parsedHashtags,
+          hashtags: hashtags.split(" ").filter(Boolean),
           privacyStatus,
-          scheduledAt: publishMode === "SCHEDULE" ? scheduledAt : undefined,
+          scheduledAt: publishMode === "SCHEDULE" && scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
         });
         successCount++;
       } catch (err: any) {
@@ -167,6 +173,7 @@ export default function PublishingDashboard() {
     }
 
     setSubmitting(false);
+
     if (successCount > 0) {
       setActionMessage({
         type: "success",
@@ -193,6 +200,23 @@ export default function PublishingDashboard() {
       fetchData();
     } catch (err: any) {
       setActionMessage({ type: "error", text: err.response?.data?.message || "Failed to connect account." });
+    }
+  };
+
+  const handleStartOAuth = async (targetPlatform?: "TIKTOK" | "YOUTUBE" | "INSTAGRAM" | "FACEBOOK") => {
+    const plat = targetPlatform || connectPlatform;
+    try {
+      const res = await api.get(`/publishing/accounts/${plat.toLowerCase()}/connect`);
+      if (res.data?.url) {
+        window.location.href = res.data.url;
+      } else {
+        setActionMessage({ type: "error", text: "Could not retrieve OAuth authorization URL." });
+      }
+    } catch (err: any) {
+      setActionMessage({
+        type: "error",
+        text: err.response?.data?.message || `OAuth connect failed for ${plat}. Ensure API keys are configured.`,
+      });
     }
   };
 
@@ -346,7 +370,28 @@ export default function PublishingDashboard() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-zinc-500 italic py-2">No account connected for {plat}.</p>
+                  <div className="space-y-2 py-1">
+                    <p className="text-xs text-zinc-500 italic">No account connected for {plat}.</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (plat === "YOUTUBE") {
+                          handleStartOAuth("YOUTUBE");
+                        } else {
+                          setConnectPlatform(plat);
+                          setShowConnectModal(true);
+                        }
+                      }}
+                      className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition shadow-sm ${
+                        plat === "YOUTUBE"
+                          ? "bg-red-600 hover:bg-red-500 text-white"
+                          : "bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
+                      }`}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      {plat === "YOUTUBE" ? "Sign in YouTube Account" : `Connect ${plat}`}
+                    </button>
+                  </div>
                 )}
               </div>
             );
@@ -727,6 +772,24 @@ export default function PublishingDashboard() {
                   <option value="INSTAGRAM">Instagram Reels</option>
                   <option value="FACEBOOK">Facebook Reels</option>
                 </select>
+              </div>
+
+              <div className="bg-violet-950/40 border border-violet-800/40 rounded-lg p-3 space-y-2">
+                <p className="text-xs text-violet-200 font-medium">Automatic Connection via OAuth 2.0 (Recommended)</p>
+                <button
+                  type="button"
+                  onClick={() => handleStartOAuth()}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs transition shadow-md"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Sign in & Connect {connectPlatform} Account
+                </button>
+              </div>
+
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-zinc-800"></div>
+                <span className="flex-shrink mx-2 text-[10px] text-zinc-500 uppercase font-semibold">Or Manual Entry (Testing)</span>
+                <div className="flex-grow border-t border-zinc-800"></div>
               </div>
 
               <div>
