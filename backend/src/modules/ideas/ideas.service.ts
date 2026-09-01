@@ -150,6 +150,7 @@ export class IdeasService {
     topic: string;
     language: string;
     existingTitles?: string[];
+    autoGenerateScript?: boolean;
   }) {
     const existingIdeas = await this.prisma.idea.findMany({
       where: { topic: dto.topic },
@@ -185,12 +186,14 @@ export class IdeasService {
       createdIdeas.push(created);
     }
 
-    for (const idea of createdIdeas) {
-      void this.generateScript(idea.id).catch((err: unknown) => {
-        this.logger.error(
-          `Failed to auto-generate script for brainstormed idea ${idea.id}: ${getErrorMessage(err)}`,
-        );
-      });
+    if (dto.autoGenerateScript !== false) {
+      for (const idea of createdIdeas) {
+        void this.generateScript(idea.id).catch((err: unknown) => {
+          this.logger.error(
+            `Failed to auto-generate script for brainstormed idea ${idea.id}: ${getErrorMessage(err)}`,
+          );
+        });
+      }
     }
 
     return createdIdeas;
@@ -423,9 +426,15 @@ export class IdeasService {
 
   async generateVideo(id: string, config: VideoJobConfig) {
     const idea = await this.findOne(id);
-    if (!idea.script?.trim()) {
+    const effectiveScript = idea.script?.trim()
+      ? idea.script
+      : config.subtitle_enabled === false
+        ? idea.description || idea.title
+        : undefined;
+
+    if (!effectiveScript && config.subtitle_enabled !== false) {
       throw new BadRequestException(
-        'Ý tưởng chưa có kịch bản. Hãy tạo hoặc nhập kịch bản trước khi sinh video.',
+        'Ý tưởng chưa có kịch bản. Hãy tạo kịch bản hoặc chọn tắt script trên video trong cấu hình sinh video.',
       );
     }
 

@@ -172,6 +172,13 @@ export default function ProductsPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [generatingProductId, setGeneratingProductId] = useState<string | null>(null);
 
+  // Product Video Config Modal State
+  const [productVideoModalId, setProductVideoModalId] = useState<string | null>(null);
+  const [productVoice, setProductVoice] = useState("vi-VN-HoaiMyNeural");
+  const [productRatio, setProductRatio] = useState("9:16");
+  const [productSubtitleEnabled, setProductSubtitleEnabled] = useState(true);
+  const [productFontName, setProductFontName] = useState("BeVietnamPro-Bold.ttf");
+
   // Research state
   const [researchUrl, setResearchUrl] = useState("");
   const [researchResult, setResearchResult] = useState<ResearchResult | null>(null);
@@ -526,15 +533,22 @@ export default function ProductsPage() {
     });
   };
 
-  const handleGenerateVideo = async (productId: string) => {
+  const handleGenerateVideo = (productId: string) => {
+    setProductVideoModalId(productId);
+  };
+
+  const handleStartProductGenerateVideo = async () => {
+    if (!productVideoModalId) return;
+    const productId = productVideoModalId;
     setGeneratingProductId(productId);
     try {
       const res = await api.post(`/products/${productId}/generate-video`, {
-        aspect_ratio: "9:16",
-        voice_name: "vi-VN-HoaiMyNeural",
-        subtitle_enabled: true,
-        font_name: "BeVietnamPro-Bold.ttf",
+        aspect_ratio: productRatio,
+        voice_name: productVoice,
+        subtitle_enabled: productSubtitleEnabled,
+        font_name: productFontName,
       });
+      setProductVideoModalId(null);
       if (res.data?.job?.id) {
         window.location.href = `/jobs/${res.data.job.id}`;
       } else {
@@ -1964,6 +1978,113 @@ export default function ProductsPage() {
                 className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl border border-zinc-800 bg-black"
               />
             )}
+          </div>
+        </div>
+      )}
+      {/* Product Video Generation Config Modal */}
+      {productVideoModalId && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="relative w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl space-y-4">
+            <button
+              onClick={() => setProductVideoModalId(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-md hover:bg-zinc-900 text-zinc-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <h3 className="font-bold text-lg text-white flex items-center gap-2">
+              <Film className="w-5 h-5 text-violet-500" />
+              Cấu Hình Sinh Video Sản Phẩm
+            </h3>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-zinc-400">Giọng đọc (TTS Voice)</label>
+              <select
+                value={productVoice}
+                onChange={(e) => setProductVoice(e.target.value)}
+                className="w-full px-3 py-2 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-100 text-sm focus:outline-none focus:border-zinc-500"
+              >
+                <option value="vi-VN-HoaiMyNeural">Tiếng Việt - Hoài My (Nữ)</option>
+                <option value="vi-VN-NamMinhNeural">Tiếng Việt - Nam Minh (Nam)</option>
+                <option value="en-US-JennyNeural">Tiếng Anh - Jenny (Nữ)</option>
+                <option value="en-US-GuyNeural">Tiếng Anh - Guy (Nam)</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-zinc-400">Tỷ lệ khung hình (Aspect Ratio)</label>
+              <select
+                value={productRatio}
+                onChange={(e) => setProductRatio(e.target.value)}
+                className="w-full px-3 py-2 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-100 text-sm focus:outline-none focus:border-zinc-500"
+              >
+                <option value="9:16">Dọc - 9:16 (TikTok, Shorts, Reels)</option>
+                <option value="16:9">Ngang - 16:9 (YouTube)</option>
+              </select>
+            </div>
+
+            {/* Script / Subtitle Toggle Option */}
+            <div className="p-3.5 rounded-lg border border-zinc-800 bg-zinc-900/60 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-xs font-bold text-white block">
+                    Tạo script / Phụ đề trên video
+                  </label>
+                  <span className="text-[10px] text-zinc-400 block mt-0.5">
+                    {productSubtitleEnabled
+                      ? "Đang Bật: Hiển thị chữ kịch bản đè lên khung hình video"
+                      : "Đang Tắt: Video thuần hình ảnh & giọng đọc, không đè chữ kịch bản"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProductSubtitleEnabled(!productSubtitleEnabled)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                    productSubtitleEnabled
+                      ? "bg-violet-600 text-white"
+                      : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {productSubtitleEnabled ? "ĐANG BẬT" : "ĐANG TẮT"}
+                </button>
+              </div>
+            </div>
+
+            {productSubtitleEnabled && (
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-400">
+                  Phông chữ Script / Phụ đề (Font)
+                </label>
+                <select
+                  value={productFontName}
+                  onChange={(e) => setProductFontName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-100 text-sm focus:outline-none focus:border-zinc-500"
+                >
+                  <option value="BeVietnamPro-Bold.ttf">
+                    Be Vietnam Pro - Bold (Khuyên dùng - Nét đậm)
+                  </option>
+                  <option value="BeVietnamPro-Medium.ttf">
+                    Be Vietnam Pro - Medium (Nét vừa)
+                  </option>
+                  <option value="Charm-Bold.ttf">Charm - Bold (Chữ nghệ thuật đậm)</option>
+                  <option value="Charm-Regular.ttf">Charm - Regular (Chữ nghệ thuật mảnh)</option>
+                  <option value="UTM Kabel KT.ttf">UTM Kabel KT (Cổ điển cá tính)</option>
+                  <option value="MicrosoftYaHeiBold.ttc">Microsoft YaHei Bold</option>
+                </select>
+              </div>
+            )}
+
+            <button
+              onClick={handleStartProductGenerateVideo}
+              disabled={generatingProductId === productVideoModalId}
+              className="w-full py-2.5 mt-4 rounded-md bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {generatingProductId === productVideoModalId ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Play className="w-4 h-4 fill-white" />
+              )}
+              Khởi tạo Job Sinh Video
+            </button>
           </div>
         </div>
       )}

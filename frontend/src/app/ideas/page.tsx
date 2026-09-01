@@ -370,6 +370,7 @@ export default function Ideas() {
         topic: newTopic,
         language: newLang,
         existingTitles,
+        autoGenerateScript: autoGenScript,
       });
     } else {
       if (!newTitle || !newTopic) return;
@@ -1021,9 +1022,7 @@ export default function Ideas() {
 
                       <button
                         onClick={() => setShowConfigModal(true)}
-                        disabled={
-                          !selectedIdea.script || isIdeaLocked(selectedIdea)
-                        }
+                        disabled={isIdeaLocked(selectedIdea)}
                         className="w-full flex items-center justify-center gap-2 py-2.5 rounded-md bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-sm transition-colors disabled:opacity-40 disabled:pointer-events-none"
                       >
                         <Play className="w-3.5 h-3.5 fill-white" />
@@ -1121,9 +1120,23 @@ export default function Ideas() {
                       <option value="en">Tiếng Anh (en)</option>
                     </select>
                   </div>
+                  <div className="flex items-center gap-2 py-2 px-3 rounded-lg border border-zinc-900 bg-zinc-900/40">
+                    <input
+                      type="checkbox"
+                      id="autoGenScriptAi"
+                      checked={autoGenScript}
+                      onChange={(e) => setAutoGenScript(e.target.checked)}
+                      className="w-4 h-4 rounded accent-violet-600 cursor-pointer"
+                    />
+                    <label
+                      htmlFor="autoGenScriptAi"
+                      className="text-xs font-medium text-zinc-300 cursor-pointer select-none"
+                    >
+                      Tự động viết Kịch bản bằng AI cho các ý tưởng mới sinh ra
+                    </label>
+                  </div>
                   <p className="text-[10px] text-zinc-600">
-                    AI sẽ tránh tiêu đề trùng và tự chạy bước viết kịch bản cho
-                    các ý tưởng mới tạo.
+                    AI sẽ tránh tiêu đề trùng và chỉ viết kịch bản nếu bạn tích chọn ô trên.
                   </p>
                   <button
                     type="submit"
@@ -1327,21 +1340,31 @@ export default function Ideas() {
                   <option value="random">Random nhạc nền hệ thống</option>
                 </select>
               </div>
-              <div className="flex items-center justify-between py-2 border-t border-b border-zinc-900 my-2">
-                <div>
-                  <label className="text-xs font-bold text-zinc-300 block">
-                    Tạo script / Phụ đề trên video
-                  </label>
-                  <span className="text-[10px] text-zinc-500 block">
-                    Hiển thị chữ kịch bản đè lên khung hình video
-                  </span>
+              {/* Script / Subtitle Toggle Option */}
+              <div className="p-3.5 rounded-lg border border-zinc-800 bg-zinc-900/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-bold text-white block">
+                      Tạo script / Phụ đề trên video
+                    </label>
+                    <span className="text-[10px] text-zinc-400 block mt-0.5">
+                      {configSubtitleEnabled
+                        ? "Đang Bật: Hiển thị chữ kịch bản/phụ đề đè lên khung hình video"
+                        : "Đang Tắt: Video thuần hình ảnh & giọng đọc, không đè chữ kịch bản"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfigSubtitleEnabled(!configSubtitleEnabled)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                      configSubtitleEnabled
+                        ? "bg-violet-600 text-white"
+                        : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    {configSubtitleEnabled ? "ĐANG BẬT" : "ĐANG TẮT"}
+                  </button>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={configSubtitleEnabled}
-                  onChange={(e) => setConfigSubtitleEnabled(e.target.checked)}
-                  className="w-4 h-4 accent-violet-600 rounded cursor-pointer"
-                />
               </div>
               {configSubtitleEnabled && (
                 <div className="space-y-1">

@@ -37,6 +37,7 @@ export class IdeasController {
       topic: string;
       language: string;
       existingTitles?: string[];
+      autoGenerateScript?: boolean;
     },
   ) {
     return this.ideasService.brainstorm(dto);
