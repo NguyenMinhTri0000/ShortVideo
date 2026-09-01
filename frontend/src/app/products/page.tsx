@@ -748,10 +748,10 @@ export default function ProductsPage() {
                   </div>
 
                   {/* Info */}
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           {renderStatusBadge(researchResult.product.researchStatus)}
                           {researchResult.product.brand && (
                             <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
@@ -764,22 +764,22 @@ export default function ProductsPage() {
                             </span>
                           )}
                         </div>
-                        <h3 className="text-lg font-bold text-zinc-100 mt-1">
+                        <h3 className="text-lg font-bold text-zinc-100 mt-1 line-clamp-2">
                           {getDisplayName(researchResult.product)}
                         </h3>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         <button
                           onClick={() => handleOpenDetailModal(researchResult.product!)}
-                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition-all"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition-all whitespace-nowrap"
                         >
                           <Eye className="w-3.5 h-3.5" /> Xem / Sửa Chi Tiết
                         </button>
                         <button
                           onClick={() => handleGenerateVideo(researchResult.product!.id)}
                           disabled={generatingProductId === researchResult.product.id}
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shadow-lg shadow-violet-600/20 shrink-0 transition-all"
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shadow-lg shadow-violet-600/20 transition-all whitespace-nowrap"
                         >
                           {generatingProductId === researchResult.product.id ? (
                             <Loader2 className="w-4 h-4 animate-spin" />

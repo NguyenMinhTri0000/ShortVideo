@@ -361,6 +361,8 @@ def tts(
     voice_file: str,
     voice_volume: float = 1.0,
 ) -> Union[SubMaker, None]:
+    if not voice_name or not voice_name.strip():
+        voice_name = "vi-VN-HoaiMyNeural"
     if is_no_voice(voice_name):
         duration_seconds = estimate_no_voice_duration(text)
         if not generate_silent_audio(duration_seconds, voice_file):

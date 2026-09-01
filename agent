@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# AI Requirement-to-Agent Prompt Compiler Executable Script
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH" python3 -m agent_compiler.cli "$@"

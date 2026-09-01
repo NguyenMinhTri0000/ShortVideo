@@ -155,7 +155,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         help="match generated/search materials to script order",
     )
-    parser.add_argument("--voice-name", default="", help="tts voice name")
+    parser.add_argument(
+        "--voice-name", default="vi-VN-HoaiMyNeural", help="tts voice name"
+    )
     parser.add_argument(
         "--voice-volume",
         type=_non_negative_float,
@@ -325,6 +327,9 @@ def build_video_params(args: argparse.Namespace) -> VideoParams:
         except Exception as exc:
             logger.warning(f"failed to parse product_data JSON: {exc}")
             params_kwargs["product_data"] = args.product_data
+
+    if not params_kwargs.get("voice_name"):
+        params_kwargs["voice_name"] = "vi-VN-HoaiMyNeural"
 
     return VideoParams(**params_kwargs)
 

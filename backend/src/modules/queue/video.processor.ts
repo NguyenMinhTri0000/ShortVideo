@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import { Logger } from '@nestjs/common';
 import ffmpeg from 'fluent-ffmpeg';
 import { type VideoJobPayload } from './queue.service';
+import { SettingsService } from '../settings/settings.service';
 
 export const cancelledJobs = new Set<string>();
 export const activeProcesses = new Map<string, ChildProcessWithoutNullStreams>();
@@ -45,6 +46,7 @@ export class VideoProcessor extends WorkerHost {
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
+    private settingsService: SettingsService,
   ) {
     super();
   }
@@ -116,9 +118,12 @@ export class VideoProcessor extends WorkerHost {
     if (language) {
       args.push('--video-language', language);
     }
-    if (config.voice_name) {
-      args.push('--voice-name', config.voice_name);
-    }
+    const settings = await this.settingsService.getSettings();
+    const effectiveVoiceName =
+      config.voice_name && config.voice_name.trim()
+        ? config.voice_name
+        : settings.default_voice || 'vi-VN-HoaiMyNeural';
+    args.push('--voice-name', effectiveVoiceName);
     if (config.aspect_ratio) {
       args.push('--video-aspect', config.aspect_ratio);
     }

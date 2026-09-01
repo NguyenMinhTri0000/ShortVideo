@@ -157,9 +157,14 @@ def generate_audio(task_id, params, video_script):
     if not custom_audio_file:
         logger.info("no custom audio file provided, using TTS to generate audio.")
         audio_file = path.join(utils.task_dir(task_id), "audio.mp3")
+        target_voice = (
+            params.voice_name
+            if params.voice_name and params.voice_name.strip()
+            else "vi-VN-HoaiMyNeural"
+        )
         sub_maker = voice.tts(
             text=video_script,
-            voice_name=voice.parse_voice_name(params.voice_name),
+            voice_name=voice.parse_voice_name(target_voice),
             voice_rate=params.voice_rate,
             voice_file=audio_file,
         )
