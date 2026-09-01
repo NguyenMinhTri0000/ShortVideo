@@ -69,6 +69,8 @@ type VideoGenerationConfig = {
   aspect_ratio: string;
   video_source: string;
   bgm_type: string;
+  subtitle_enabled?: boolean;
+  font_name?: string;
 };
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -123,6 +125,8 @@ export default function Ideas() {
   const [configRatio, setConfigRatio] = useState("");
   const [configSource, setConfigSource] = useState("");
   const [configBgm, setConfigBgm] = useState("random");
+  const [configSubtitleEnabled, setConfigSubtitleEnabled] = useState(true);
+  const [configFontName, setConfigFontName] = useState("BeVietnamPro-Bold.ttf");
 
   const {
     data: ideas = [],
@@ -395,6 +399,8 @@ export default function Ideas() {
       aspect_ratio: configRatio || settings.default_aspect_ratio || "9:16",
       video_source: configSource || settings.default_video_source || "pexels",
       bgm_type: configBgm,
+      subtitle_enabled: configSubtitleEnabled,
+      font_name: configFontName || "BeVietnamPro-Bold.ttf",
     };
     videoJobMutation.mutate({
       id: selectedIdea.id,
@@ -409,6 +415,8 @@ export default function Ideas() {
       aspect_ratio: configRatio || settings.default_aspect_ratio || "9:16",
       video_source: configSource || settings.default_video_source || "pexels",
       bgm_type: configBgm,
+      subtitle_enabled: configSubtitleEnabled,
+      font_name: configFontName || "BeVietnamPro-Bold.ttf",
     };
     batchVideoMutation.mutate({
       topic: batchConfigTopic,
@@ -1319,6 +1327,53 @@ export default function Ideas() {
                   <option value="random">Random nhạc nền hệ thống</option>
                 </select>
               </div>
+              <div className="flex items-center justify-between py-2 border-t border-b border-zinc-900 my-2">
+                <div>
+                  <label className="text-xs font-bold text-zinc-300 block">
+                    Tạo script / Phụ đề trên video
+                  </label>
+                  <span className="text-[10px] text-zinc-500 block">
+                    Hiển thị chữ kịch bản đè lên khung hình video
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={configSubtitleEnabled}
+                  onChange={(e) => setConfigSubtitleEnabled(e.target.checked)}
+                  className="w-4 h-4 accent-violet-600 rounded cursor-pointer"
+                />
+              </div>
+              {configSubtitleEnabled && (
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-400">
+                    Phông chữ Script / Phụ đề (Font)
+                  </label>
+                  <select
+                    value={configFontName}
+                    onChange={(e) => setConfigFontName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-100 text-sm focus:outline-none focus:border-zinc-500"
+                  >
+                    <option value="BeVietnamPro-Bold.ttf">
+                      Be Vietnam Pro - Bold (Khuyên dùng - Nét đậm)
+                    </option>
+                    <option value="BeVietnamPro-Medium.ttf">
+                      Be Vietnam Pro - Medium (Nét vừa)
+                    </option>
+                    <option value="Charm-Bold.ttf">
+                      Charm - Bold (Chữ nghệ thuật đậm)
+                    </option>
+                    <option value="Charm-Regular.ttf">
+                      Charm - Regular (Chữ nghệ thuật mảnh)
+                    </option>
+                    <option value="UTM Kabel KT.ttf">
+                      UTM Kabel KT (Cổ điển cá tính)
+                    </option>
+                    <option value="MicrosoftYaHeiBold.ttc">
+                      Microsoft YaHei Bold
+                    </option>
+                  </select>
+                </div>
+              )}
               {batchConfigTopic ? (
                 <button
                   onClick={handleBatchGenerateVideo}

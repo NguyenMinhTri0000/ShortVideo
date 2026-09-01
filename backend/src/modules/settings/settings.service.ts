@@ -91,6 +91,8 @@ export class SettingsService {
       default_aspect_ratio: '9:16',
       default_video_source: 'pexels',
       subtitle_provider: 'edge',
+      subtitle_font_name: 'BeVietnamPro-Bold.ttf',
+      subtitle_enabled: 'true',
       tls_verify: 'true',
       edge_tts_timeout: '30',
       enable_redis: 'false',
@@ -286,7 +288,10 @@ export class SettingsService {
           { key: 'whisper_device', isArray: false, isBool: false },
           { key: 'whisper_compute_type', isArray: false, isBool: false },
         ],
-        ui: [{ key: 'subtitle_font_name', isArray: false, isBool: false }],
+        ui: [
+          { key: 'subtitle_font_name', isArray: false, isBool: false },
+          { key: 'subtitle_enabled', isArray: false, isBool: true },
+        ],
         proxy: [
           { key: 'proxy_http', isArray: false, isBool: false },
           { key: 'proxy_https', isArray: false, isBool: false },

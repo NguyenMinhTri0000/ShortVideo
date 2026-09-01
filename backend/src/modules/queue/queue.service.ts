@@ -11,6 +11,8 @@ export type VideoJobConfig = {
   bgm_type?: string;
   bgm_file?: string;
   bgm_volume?: number;
+  subtitle_enabled?: boolean;
+  subtitle_position?: string;
   font_name?: string;
   font_size?: number;
   stroke_color?: string;

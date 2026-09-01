@@ -975,7 +975,7 @@ def generate_video(
     font_path = ""
     if params.subtitle_enabled:
         if not params.font_name:
-            params.font_name = config.ui.get("font_name", "STHeitiMedium.ttc")
+            params.font_name = config.ui.get("font_name", "BeVietnamPro-Bold.ttf")
         font_path = os.path.join(utils.font_dir(), params.font_name)
         if os.name == "nt":
             font_path = font_path.replace("\\", "/")

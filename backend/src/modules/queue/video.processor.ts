@@ -142,8 +142,28 @@ export class VideoProcessor extends WorkerHost {
     if (config.bgm_volume !== undefined) {
       args.push('--bgm-volume', config.bgm_volume.toString());
     }
-    if (config.font_name) {
-      args.push('--font-name', config.font_name);
+    const isSubtitleEnabled =
+      config.subtitle_enabled !== undefined
+        ? config.subtitle_enabled
+        : settings.subtitle_enabled !== undefined
+          ? String(settings.subtitle_enabled) === 'true'
+          : true;
+
+    if (isSubtitleEnabled) {
+      args.push('--subtitle-enabled');
+    } else {
+      args.push('--no-subtitle-enabled');
+    }
+
+    const effectiveFontName =
+      config.font_name || settings.subtitle_font_name || 'BeVietnamPro-Bold.ttf';
+    args.push('--font-name', effectiveFontName);
+
+    if (config.subtitle_position || settings.subtitle_position) {
+      args.push(
+        '--subtitle-position',
+        config.subtitle_position || settings.subtitle_position,
+      );
     }
     if (config.font_size) {
       args.push('--font-size', config.font_size.toString());

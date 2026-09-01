@@ -532,6 +532,8 @@ export default function ProductsPage() {
       const res = await api.post(`/products/${productId}/generate-video`, {
         aspect_ratio: "9:16",
         voice_name: "vi-VN-HoaiMyNeural",
+        subtitle_enabled: true,
+        font_name: "BeVietnamPro-Bold.ttf",
       });
       if (res.data?.job?.id) {
         window.location.href = `/jobs/${res.data.job.id}`;

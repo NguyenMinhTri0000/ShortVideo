@@ -352,6 +352,8 @@ export default function SystemSettings() {
   const [ratio, setRatio] = useState<string | null>(null);
   const [source, setSource] = useState<string | null>(null);
   const [subtitleProvider, setSubtitleProvider] = useState<string | null>(null);
+  const [subtitleFontName, setSubtitleFontName] = useState<string | null>(null);
+  const [subtitleEnabled, setSubtitleEnabled] = useState<string | null>(null);
   const [edgeTtsTimeout, setEdgeTtsTimeout] = useState<string | null>(null);
 
   // Advanced state
@@ -429,6 +431,16 @@ export default function SystemSettings() {
         subtitleProvider,
         "subtitle_provider",
         "edge",
+      ),
+      subtitle_font_name: getValue(
+        subtitleFontName,
+        "subtitle_font_name",
+        "BeVietnamPro-Bold.ttf",
+      ),
+      subtitle_enabled: getValue(
+        subtitleEnabled,
+        "subtitle_enabled",
+        "true",
       ),
       edge_tts_timeout: getValue(edgeTtsTimeout, "edge_tts_timeout", "30"),
       tls_verify: getValue(tlsVerify, "tls_verify", "true"),
@@ -845,6 +857,52 @@ export default function SystemSettings() {
                     Whisper (chính xác hơn, cần GPU)
                   </option>
                   <option value="">Không tạo phụ đề</option>
+                </select>
+              </FieldRow>
+              <FieldRow
+                label="Bật Script / Phụ đề trên Video"
+                hint="Hiển thị kịch bản chữ đè lên video mặc định"
+              >
+                <select
+                  value={getValue(subtitleEnabled, "subtitle_enabled", "true")}
+                  onChange={(e) => setSubtitleEnabled(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-zinc-600"
+                >
+                  <option value="true">Bật (Tạo & hiển thị chữ kịch bản)</option>
+                  <option value="false">Tắt (Không đè chữ kịch bản)</option>
+                </select>
+              </FieldRow>
+              <FieldRow
+                label="Phông chữ Script / Phụ đề"
+                hint="Font chữ hiển thị chữ tiếng Việt trên video"
+              >
+                <select
+                  value={getValue(
+                    subtitleFontName,
+                    "subtitle_font_name",
+                    "BeVietnamPro-Bold.ttf",
+                  )}
+                  onChange={(e) => setSubtitleFontName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-zinc-600"
+                >
+                  <option value="BeVietnamPro-Bold.ttf">
+                    Be Vietnam Pro - Bold (Khuyên dùng - Nét đậm)
+                  </option>
+                  <option value="BeVietnamPro-Medium.ttf">
+                    Be Vietnam Pro - Medium (Nét vừa)
+                  </option>
+                  <option value="Charm-Bold.ttf">
+                    Charm - Bold (Chữ nghệ thuật đậm)
+                  </option>
+                  <option value="Charm-Regular.ttf">
+                    Charm - Regular (Chữ nghệ thuật mảnh)
+                  </option>
+                  <option value="UTM Kabel KT.ttf">
+                    UTM Kabel KT (Cổ điển cá tính)
+                  </option>
+                  <option value="MicrosoftYaHeiBold.ttc">
+                    Microsoft YaHei Bold (Font hệ thống)
+                  </option>
                 </select>
               </FieldRow>
               <FieldRow
