@@ -381,6 +381,57 @@ export class PublishingService {
     return updated;
   }
 
+  private safeString(val: any, fallback = ''): string {
+    if (val === null || val === undefined) return fallback;
+    if (typeof val === 'string') return val;
+    if (typeof val === 'object') {
+      try {
+        return JSON.stringify(val);
+      } catch {
+        return String(val);
+      }
+    }
+    return String(val);
+  }
+
+  private async ensureFreshToken(account: any, adapter: PlatformAdapter): Promise<any> {
+    if (!adapter.refreshAuthToken || !account.refreshToken) {
+      return account;
+    }
+
+    const expiresAtMs = account.tokenExpiresAt ? new Date(account.tokenExpiresAt).getTime() : 0;
+    const isExpiredOrExpiringSoon = !expiresAtMs || expiresAtMs - Date.now() < 5 * 60 * 1000;
+
+    if (!isExpiredOrExpiringSoon) {
+      return account;
+    }
+
+    try {
+      this.logger.log(`Refreshing access token for ${account.platform} account "${account.accountName}" (${account.id})...`);
+      const refreshed = await adapter.refreshAuthToken(account);
+      const encryptedAccess = this.encryptionService.encrypt(refreshed.accessToken);
+      const encryptedRefresh = refreshed.refreshToken
+        ? this.encryptionService.encrypt(refreshed.refreshToken)
+        : account.refreshToken;
+
+      const updatedAccount = await this.prisma.platformAccount.update({
+        where: { id: account.id },
+        data: {
+          accessToken: encryptedAccess,
+          refreshToken: encryptedRefresh,
+          tokenExpiresAt: refreshed.expiresAt,
+          status: 'ACTIVE',
+        },
+      });
+
+      this.logger.log(`Successfully refreshed access token for ${account.platform} account "${account.accountName}".`);
+      return updatedAccount;
+    } catch (err: any) {
+      this.logger.error(`Failed to auto-refresh token for account ${account.id}: ${err.message || err}`);
+      return account;
+    }
+  }
+
   // --- JOB EXECUTION WORKER STEP ---
 
   async executePublishJob(jobId: string): Promise<void> {
@@ -409,12 +460,27 @@ export class PublishingService {
     });
 
     try {
+      const adapter = this.getAdapter(job.platform as PlatformType);
+
+      // Auto-refresh access token if expired or expiring soon
+      let activeAccount = await this.ensureFreshToken(job.platformAccount, adapter);
+
       // Get download URL / stream from MinIO / StorageService
       const downloadUrl = await this.storageService.getDownloadUrl(job.video.videoObjectKey, 86400);
 
-      const adapter = this.getAdapter(job.platform as PlatformType);
+      let videoBuffer: Buffer | undefined;
+      try {
+        const streamResult = await this.storageService.getFileStream(job.video.videoObjectKey);
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of streamResult.stream) {
+          chunks.push(chunk);
+        }
+        videoBuffer = Buffer.concat(chunks);
+      } catch (err: any) {
+        this.logger.warn(`Could not load video buffer directly from MinIO: ${err.message || err}`);
+      }
 
-      const publishResult = await adapter.publish(job.platformAccount, {
+      const publishParams = {
         jobId: job.id,
         videoId: job.videoId,
         title: job.title || job.video.title,
@@ -425,7 +491,41 @@ export class PublishingService {
         privacyStatus: job.privacyStatus || 'public',
         platformMetadata: (job.platformMetadata as Record<string, any>) || {},
         downloadUrl,
-      });
+        videoBuffer,
+      };
+
+      let publishResult = await adapter.publish(activeAccount, publishParams);
+
+      // If failed with 401 Auth error, force a refresh once and retry publish
+      const isAuthError = !publishResult.success && (
+        String(publishResult.errorCode) === '401' ||
+        String(publishResult.errorCode) === 'UNAUTHORIZED' ||
+        String(publishResult.errorMessage).includes('invalid authentication credentials')
+      );
+
+      if (isAuthError && adapter.refreshAuthToken && activeAccount.refreshToken) {
+        this.logger.warn(`Job ${jobId} failed with auth error 401. Attempting forced token refresh and retry...`);
+        try {
+          const refreshed = await adapter.refreshAuthToken(activeAccount);
+          const encryptedAccess = this.encryptionService.encrypt(refreshed.accessToken);
+          const encryptedRefresh = refreshed.refreshToken
+            ? this.encryptionService.encrypt(refreshed.refreshToken)
+            : activeAccount.refreshToken;
+
+          activeAccount = await this.prisma.platformAccount.update({
+            where: { id: activeAccount.id },
+            data: {
+              accessToken: encryptedAccess,
+              refreshToken: encryptedRefresh,
+              tokenExpiresAt: refreshed.expiresAt,
+              status: 'ACTIVE',
+            },
+          });
+          publishResult = await adapter.publish(activeAccount, publishParams);
+        } catch (refreshErr: any) {
+          this.logger.error(`Forced token refresh failed: ${refreshErr.message || refreshErr}`);
+        }
+      }
 
       if (publishResult.success) {
         await this.prisma.publishJob.update({
@@ -433,8 +533,8 @@ export class PublishingService {
           data: {
             status: 'PUBLISHED',
             publishedAt: publishResult.publishedAt || new Date(),
-            platformPostId: publishResult.platformPostId,
-            platformUrl: publishResult.platformUrl,
+            platformPostId: this.safeString(publishResult.platformPostId),
+            platformUrl: this.safeString(publishResult.platformUrl),
             errorMessage: null,
             errorCode: null,
           },
@@ -453,23 +553,31 @@ export class PublishingService {
           where: { id: jobId },
           data: {
             status: 'FAILED',
-            errorMessage: publishResult.errorMessage || 'Publishing failed without specific error message.',
-            errorCode: publishResult.errorCode || 'UNKNOWN_ERROR',
+            errorMessage: this.safeString(publishResult.errorMessage, 'Publishing failed without specific error message.'),
+            errorCode: this.safeString(publishResult.errorCode, 'UNKNOWN_ERROR'),
           },
         });
 
         this.logger.error(`Publish job ${jobId} failed: ${publishResult.errorMessage} (Code: ${publishResult.errorCode})`);
       }
     } catch (error: any) {
-      await this.prisma.publishJob.update({
-        where: { id: jobId },
-        data: {
-          status: 'FAILED',
-          errorMessage: error.message || 'Internal error during job execution.',
-          errorCode: 'INTERNAL_JOB_ERROR',
-        },
-      });
-      this.logger.error(`Execution crash on publish job ${jobId}: ${error.message}`, error.stack);
+      const errorMsg = this.safeString(error?.message || error, 'Internal error during job execution.');
+      const errorCode = this.safeString(error?.code || error?.errorCode, 'INTERNAL_JOB_ERROR');
+
+      this.logger.error(`Execution crash on publish job ${jobId}: ${errorMsg}`, error?.stack);
+
+      try {
+        await this.prisma.publishJob.update({
+          where: { id: jobId },
+          data: {
+            status: 'FAILED',
+            errorMessage: errorMsg,
+            errorCode: errorCode,
+          },
+        });
+      } catch (updateErr: any) {
+        this.logger.error(`Failed to record job ${jobId} failure state: ${updateErr?.message || updateErr}`);
+      }
     }
   }
 }

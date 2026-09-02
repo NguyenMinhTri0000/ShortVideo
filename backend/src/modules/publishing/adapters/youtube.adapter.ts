@@ -180,10 +180,22 @@ export class YouTubeAdapter implements PlatformAdapter {
 
       // If uploadUrl returned, stream buffer/file bytes
       let finalVideoId = initResponse.data?.id;
-      if (uploadUrl && params.videoBuffer) {
-        const uploadRes = await axios.put(uploadUrl, params.videoBuffer, {
+      let bufferToUpload = params.videoBuffer;
+
+      if (uploadUrl && !bufferToUpload && params.downloadUrl) {
+        try {
+          const downloadRes = await axios.get(params.downloadUrl, { responseType: 'arraybuffer' });
+          bufferToUpload = Buffer.from(downloadRes.data);
+        } catch (downloadErr: any) {
+          this.logger.error(`Failed to download video bytes from downloadUrl: ${downloadErr.message || downloadErr}`);
+        }
+      }
+
+      if (uploadUrl && bufferToUpload) {
+        const uploadRes = await axios.put(uploadUrl, bufferToUpload, {
           headers: {
             'Content-Type': params.mimeType || 'video/mp4',
+            'Content-Length': bufferToUpload.length,
           },
         });
         finalVideoId = uploadRes.data?.id || finalVideoId;
@@ -206,10 +218,13 @@ export class YouTubeAdapter implements PlatformAdapter {
       };
     } catch (error: any) {
       this.logger.error(`YouTube Shorts upload failed: ${error.message}`, error.stack);
+      const is401 = error.response?.status === 401 || error.response?.data?.error?.code === 401;
       return {
         success: false,
-        errorCode: error.response?.data?.error?.code || 'YOUTUBE_API_ERROR',
-        errorMessage: error.response?.data?.error?.message || error.message || 'Failed to publish video to YouTube Shorts.',
+        errorCode: is401 ? '401' : (error.response?.data?.error?.code || 'YOUTUBE_API_ERROR'),
+        errorMessage: is401
+          ? 'Phiên đăng nhập YouTube đã hết hạn (Google OAuth 401). Vui lòng nhấn nút "Sign in YouTube Account" ở trên để kết nối lại tài khoản.'
+          : (error.response?.data?.error?.message || error.message || 'Failed to publish video to YouTube Shorts.'),
         rawResponse: error.response?.data,
       };
     }

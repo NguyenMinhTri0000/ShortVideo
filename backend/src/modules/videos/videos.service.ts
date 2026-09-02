@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { JobsService } from '../jobs/jobs.service';
@@ -45,6 +45,29 @@ export class VideosService {
     });
   }
 
+  async uploadVideo(file: { buffer: Buffer; originalname?: string; mimetype?: string }, title?: string) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('Vui lòng chọn file video hợp lệ');
+    }
+    const ext = file.originalname?.split('.').pop() || 'mp4';
+    const key = `uploads/videos/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${ext}`;
+    const contentType = file.mimetype || 'video/mp4';
+
+    await this.storage.uploadBuffer(file.buffer, key, contentType);
+
+    const videoTitle = title || file.originalname || 'Uploaded Video';
+
+    const video = await this.prisma.video.create({
+      data: {
+        title: videoTitle,
+        videoObjectKey: key,
+        ratio: '9:16',
+      },
+    });
+
+    return video;
+  }
+
   async remove(id: string) {
     const video = await this.getVideoOrThrow(id);
 
@@ -73,6 +96,9 @@ export class VideosService {
 
   async regenerate(id: string) {
     const video = await this.getVideoOrThrow(id);
+    if (!video.jobId) {
+      throw new BadRequestException('Video này được tải lên thủ công, không có công việc sinh tự động để tạo lại.');
+    }
     return this.jobsService.retry(video.jobId);
   }
 

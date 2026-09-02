@@ -2,12 +2,16 @@ import {
   Controller,
   Get,
   Post,
+  Body,
   Param,
   Delete,
   Res,
   Headers,
   StreamableFile,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { VideosService } from './videos.service';
 
@@ -18,6 +22,15 @@ export class VideosController {
   @Get()
   findAll() {
     return this.videosService.findAll();
+  }
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadVideo(
+    @UploadedFile() file: any,
+    @Body('title') title?: string,
+  ) {
+    return this.videosService.uploadVideo(file, title);
   }
 
   @Get(':id')

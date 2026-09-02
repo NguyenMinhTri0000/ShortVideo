@@ -16,6 +16,11 @@ import {
   AlertCircle,
   Video as VideoIcon,
   Send,
+  Upload,
+  Play,
+  Film,
+  FileVideo,
+  Loader2,
 } from "lucide-react";
 
 interface PlatformAccount {
@@ -76,11 +81,76 @@ export default function PublishingDashboard() {
   const [publishMode, setPublishMode] = useState<"NOW" | "SCHEDULE">("NOW");
   const [scheduledAt, setScheduledAt] = useState("");
 
+  // Direct Video Selection & Upload State
+  const [videoSourceTab, setVideoSourceTab] = useState<"select" | "upload">("select");
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [dragActive, setDragActive] = useState(false);
+
   // Connect Modal / Manual Account State
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [connectPlatform, setConnectPlatform] = useState<"TIKTOK" | "YOUTUBE" | "INSTAGRAM" | "FACEBOOK">("TIKTOK");
   const [manualAccountName, setManualAccountName] = useState("");
   const [manualAccessToken, setManualAccessToken] = useState("");
+
+  const handleUploadFile = async (file: File) => {
+    if (!file.type.startsWith("video/")) {
+      setActionMessage({ type: "error", text: "Vui lòng chọn file video hợp lệ (MP4, MOV, WebM...)." });
+      return;
+    }
+    setUploadingVideo(true);
+    setUploadProgress(20);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("title", file.name.replace(/\.[^/.]+$/, ""));
+
+    try {
+      setUploadProgress(60);
+      const res = await api.post("/videos/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setUploadProgress(100);
+      const newVideo = res.data;
+      if (newVideo && newVideo.id) {
+        setVideos((prev) => [newVideo, ...prev]);
+        setSelectedVideoId(newVideo.id);
+        setTitle(newVideo.title || file.name);
+        setActionMessage({
+          type: "success",
+          text: `Đã tải lên video "${newVideo.title}" thành công và tự động chọn để đăng!`,
+        });
+      }
+    } catch (err: any) {
+      setActionMessage({
+        type: "error",
+        text: err.response?.data?.message || "Tải video thất bại. Vui lòng thử lại.",
+      });
+    } finally {
+      setUploadingVideo(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleUploadFile(e.dataTransfer.files[0]);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -410,26 +480,134 @@ export default function PublishingDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Left Column: Select Video & Select Accounts */}
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1.5 flex items-center gap-1.5">
-                  <VideoIcon className="w-3.5 h-3.5 text-violet-400" />
-                  Select Generated Video
-                </label>
-                <select
-                  value={selectedVideoId}
-                  onChange={(e) => handleVideoSelect(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
-                >
-                  {videos.length === 0 ? (
-                    <option value="">No generated videos found</option>
-                  ) : (
-                    videos.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.title} ({new Date(v.createdAt).toLocaleDateString()})
-                      </option>
-                    ))
-                  )}
-                </select>
+              {/* Select or Upload Video Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                    <VideoIcon className="w-3.5 h-3.5 text-violet-400" />
+                    Video to Publish
+                  </label>
+
+                  {/* Tabs */}
+                  <div className="flex bg-zinc-950 p-0.5 rounded-lg border border-zinc-800 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setVideoSourceTab("select")}
+                      className={`px-2.5 py-1 rounded-md transition font-medium flex items-center gap-1 ${
+                        videoSourceTab === "select"
+                          ? "bg-violet-600 text-white shadow-sm"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      <Film className="w-3 h-3" />
+                      Select Video
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVideoSourceTab("upload")}
+                      className={`px-2.5 py-1 rounded-md transition font-medium flex items-center gap-1 ${
+                        videoSourceTab === "upload"
+                          ? "bg-violet-600 text-white shadow-sm"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      <Upload className="w-3 h-3" />
+                      Upload File
+                    </button>
+                  </div>
+                </div>
+
+                {videoSourceTab === "select" ? (
+                  <div>
+                    <select
+                      value={selectedVideoId}
+                      onChange={(e) => handleVideoSelect(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+                    >
+                      {videos.length === 0 ? (
+                        <option value="">No generated or uploaded videos found</option>
+                      ) : (
+                        videos.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.title} ({new Date(v.createdAt).toLocaleDateString()})
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                ) : (
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`relative border-2 border-dashed rounded-xl p-4 text-center transition ${
+                      dragActive
+                        ? "border-violet-500 bg-violet-950/20"
+                        : "border-zinc-800 bg-zinc-950/60 hover:border-zinc-700"
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      accept="video/*"
+                      id="video-file-input"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleUploadFile(e.target.files[0]);
+                        }
+                      }}
+                    />
+                    {uploadingVideo ? (
+                      <div className="py-3 space-y-2 flex flex-col items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+                        <p className="text-xs text-zinc-300 font-medium">Uploading video file...</p>
+                        <div className="w-48 bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-violet-500 h-full transition-all duration-300"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <label htmlFor="video-file-input" className="cursor-pointer block space-y-1.5 py-1">
+                        <Upload className="w-6 h-6 mx-auto text-violet-400" />
+                        <p className="text-xs font-semibold text-zinc-200">
+                          Click to select or drop video file here
+                        </p>
+                        <p className="text-[10px] text-zinc-500">
+                          Supports MP4, MOV, WebM (Auto-selects upon upload)
+                        </p>
+                      </label>
+                    )}
+                  </div>
+                )}
+
+                {/* Selected Video Live Preview Player */}
+                {selectedVideoId && (
+                  <div className="bg-zinc-950 border border-zinc-800/80 rounded-xl p-3 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileVideo className="w-4 h-4 text-violet-400" />
+                        <span className="text-xs font-semibold text-zinc-200 truncate max-w-[200px]">
+                          {videos.find((v) => v.id === selectedVideoId)?.title || "Selected Video"}
+                        </span>
+                      </div>
+                      <span className="text-[10px] bg-violet-500/10 text-violet-400 border border-violet-500/20 px-2 py-0.5 rounded font-mono">
+                        9:16 Short
+                      </span>
+                    </div>
+
+                    <div className="overflow-hidden rounded-lg bg-black border border-zinc-800 flex justify-center">
+                      <video
+                        key={selectedVideoId}
+                        controls
+                        preload="metadata"
+                        src={`/api/videos/${selectedVideoId}/stream`}
+                        className="max-h-48 w-auto rounded-lg"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

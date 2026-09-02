@@ -159,10 +159,10 @@ model GenerationJob {
 
 model Video {
   id                 String   @id @default(uuid())
-  ideaId             String
-  idea               Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
-  jobId              String
-  job                GenerationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  ideaId             String?
+  idea               Idea?    @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  jobId              String?
+  job                GenerationJob? @relation(fields: [jobId], references: [id], onDelete: Cascade)
   title              String
   script             String?
   videoObjectKey     String

@@ -1,13 +1,12 @@
 import type { NextConfig } from "next";
 
-const API_UPSTREAM = process.env.API_UPSTREAM || 'http://backend:23001';
-
 const nextConfig: NextConfig = {
   async rewrites() {
+    const upstream = process.env.API_UPSTREAM || 'http://127.0.0.1:23001';
     return [
       {
         source: '/api/:path*',
-        destination: `${API_UPSTREAM}/api/:path*`,
+        destination: `${upstream}/api/:path*`,
       },
     ];
   },
