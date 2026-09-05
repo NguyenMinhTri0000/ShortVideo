@@ -92,6 +92,7 @@ export default function PublishingDashboard() {
   const [connectPlatform, setConnectPlatform] = useState<"TIKTOK" | "YOUTUBE" | "INSTAGRAM" | "FACEBOOK">("TIKTOK");
   const [manualAccountName, setManualAccountName] = useState("");
   const [manualAccessToken, setManualAccessToken] = useState("");
+  const [platformConfig, setPlatformConfig] = useState<Record<string, { isConfigured: boolean; missing: string[] }>>({});
 
   const handleUploadFile = async (file: File) => {
     if (!file.type.startsWith("video/")) {
@@ -155,14 +156,16 @@ export default function PublishingDashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [accRes, vidRes, jobsRes] = await Promise.all([
+      const [accRes, vidRes, jobsRes, configRes] = await Promise.all([
         api.get("/publishing/accounts"),
         api.get("/videos"),
         api.get("/publishing/jobs"),
+        api.get("/publishing/config-status").catch(() => ({ data: {} })),
       ]);
       setAccounts(accRes.data || []);
       setVideos(vidRes.data || []);
       setJobs(jobsRes.data || []);
+      setPlatformConfig(configRes.data || {});
 
       if (vidRes.data && vidRes.data.length > 0 && !selectedVideoId) {
         setSelectedVideoId(vidRes.data[0].id);
@@ -398,8 +401,11 @@ export default function PublishingDashboard() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {(["TIKTOK", "YOUTUBE", "INSTAGRAM", "FACEBOOK"] as const).map((plat) => {
-            const accList = accounts.filter((a) => a.platform === plat);
+            const accList = accounts.filter(
+              (a) => a.platform === plat && a.status === "ACTIVE" && a.accountId && !["facebook_page", "instagram_account", "tiktok_user", "youtube_channel"].includes(a.accountId),
+            );
             const hasConnected = accList.length > 0;
+            const isApiConfigured = platformConfig[plat]?.isConfigured ?? false;
 
             return (
               <div
@@ -418,6 +424,13 @@ export default function PublishingDashboard() {
                     }`}
                   >
                     {hasConnected ? "CONNECTED" : "NOT CONNECTED"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1">
+                  <span>Backend API Config:</span>
+                  <span className={isApiConfigured ? "text-emerald-400 font-semibold" : "text-amber-400 font-semibold"}>
+                    {isApiConfigured ? "Ready" : "Missing Keys"}
                   </span>
                 </div>
 
@@ -445,15 +458,15 @@ export default function PublishingDashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (plat === "YOUTUBE") {
-                          handleStartOAuth("YOUTUBE");
+                        setConnectPlatform(plat);
+                        if (isApiConfigured) {
+                          handleStartOAuth(plat);
                         } else {
-                          setConnectPlatform(plat);
                           setShowConnectModal(true);
                         }
                       }}
                       className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition shadow-sm ${
-                        plat === "YOUTUBE"
+                        plat === "YOUTUBE" && isApiConfigured
                           ? "bg-red-600 hover:bg-red-500 text-white"
                           : "bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
                       }`}
@@ -951,6 +964,25 @@ export default function PublishingDashboard() {
                   <option value="FACEBOOK">Facebook Reels</option>
                 </select>
               </div>
+
+              {platformConfig[connectPlatform] && !platformConfig[connectPlatform].isConfigured && (
+                <div className="bg-amber-950/40 border border-amber-800/50 rounded-lg p-3 text-xs text-amber-200 space-y-1.5">
+                  <p className="font-semibold flex items-center gap-1.5 text-amber-300">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                    {connectPlatform} OAuth Credentials Not Configured in Backend
+                  </p>
+                  <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                    Missing configuration:{" "}
+                    <code className="bg-amber-900/60 px-1.5 py-0.5 rounded text-amber-100 font-mono">
+                      {platformConfig[connectPlatform].missing.join(", ")}
+                    </code>.
+                    To enable automatic OAuth sign-in, add these keys to your <code className="bg-amber-900/60 px-1 py-0.5 rounded text-amber-100 font-mono">backend/.env</code> file and restart Docker (<code className="bg-amber-900/60 px-1 py-0.5 rounded text-amber-100 font-mono">docker compose up -d backend</code>).
+                  </p>
+                  <p className="text-[11px] text-amber-300/90 pt-0.5 font-medium">
+                    💡 You can also use <strong>Manual Entry</strong> below with an Access Token to connect immediately.
+                  </p>
+                </div>
+              )}
 
               <div className="bg-violet-950/40 border border-violet-800/40 rounded-lg p-3 space-y-2">
                 <p className="text-xs text-violet-200 font-medium">Automatic Connection via OAuth 2.0 (Recommended)</p>

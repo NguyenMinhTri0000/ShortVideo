@@ -127,12 +127,12 @@ export class YouTubeAdapter implements PlatformAdapter {
   async publish(account: PlatformAccount, params: PublishParams): Promise<PublishResult> {
     const decryptedToken = this.encryptionService.decrypt(account.accessToken);
 
-    if (!this.isConfigured() || !decryptedToken) {
-      this.logger.warn(`YouTube Shorts publishing failed: Adapter not fully configured or missing token for account ${account.id}`);
+    if (!decryptedToken) {
+      this.logger.warn(`YouTube Shorts publishing failed: missing token for account ${account.id}`);
       return {
         success: false,
         errorCode: 'NOT_CONFIGURED',
-        errorMessage: 'YouTube API is not fully configured with OAuth client credentials or valid user token.',
+        errorMessage: 'YouTube Shorts API requires a valid user token to publish videos.',
       };
     }
 

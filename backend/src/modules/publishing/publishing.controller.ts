@@ -20,6 +20,45 @@ export class PublishingController {
 
   // --- ACCOUNTS ---
 
+  @Get('config-status')
+  @Get('accounts/config-status')
+  async getConfigStatus() {
+    return this.publishingService.getConfigStatus();
+  }
+
+  @Get('debug/:platform')
+  async getPlatformDebugInfo(@Param('platform') platform: string) {
+    const plat = platform.toUpperCase() as PlatformType;
+    const adapter = this.publishingService.getAdapter(plat);
+    const redirectUri = this.getDefaultRedirect(platform);
+    const missingConfig = adapter.getMissingConfig ? adapter.getMissingConfig() : [];
+
+    let oauthAuthUrl: string | null = null;
+    let authUrlError: string | null = null;
+
+    if (adapter.isConfigured() && adapter.getAuthUrl) {
+      try {
+        const res = adapter.getAuthUrl(redirectUri);
+        oauthAuthUrl = res.url;
+      } catch (err: any) {
+        authUrlError = err.message || 'Error generating auth URL';
+      }
+    }
+
+    return {
+      platform: plat,
+      isConfigured: adapter.isConfigured(),
+      missingConfig,
+      redirectUri,
+      oauthAuthUrlGenerated: Boolean(oauthAuthUrl),
+      authUrlError,
+      environmentCheck: {
+        oauthRedirectBaseUrl: process.env.OAUTH_REDIRECT_BASE_URL || null,
+        frontendUrl: process.env.FRONTEND_URL || null,
+      },
+    };
+  }
+
   @Get('accounts')
   async getAccounts() {
     return this.publishingService.getAccounts();
@@ -35,14 +74,22 @@ export class PublishingController {
     return this.publishingService.deleteAccount(id);
   }
 
+  private getDefaultRedirect(platform: string): string {
+    const envKey = `${platform.toUpperCase()}_REDIRECT_URI`;
+    if (process.env[envKey]) {
+      return process.env[envKey]!;
+    }
+    const baseUrl = process.env.OAUTH_REDIRECT_BASE_URL || process.env.CORS_ORIGIN || 'http://localhost:23000';
+    return `${baseUrl}/api/publishing/accounts/${platform.toLowerCase()}/callback`;
+  }
+
   @Get('accounts/:platform/connect')
   async getConnectUrl(
     @Param('platform') platform: string,
     @Query('redirectUri') redirectUri: string,
   ) {
     const plat = platform.toUpperCase() as PlatformType;
-    const baseUrl = process.env.OAUTH_REDIRECT_BASE_URL || process.env.CORS_ORIGIN || 'http://localhost:23000';
-    const defaultRedirect = `${baseUrl}/api/publishing/accounts/${platform.toLowerCase()}/callback`;
+    const defaultRedirect = this.getDefaultRedirect(platform);
     return this.publishingService.getOAuthUrl(plat, redirectUri || defaultRedirect);
   }
 
@@ -53,19 +100,19 @@ export class PublishingController {
     @Query('redirectUri') redirectUri: string,
     @Res() res: Response,
   ) {
+    const frontendUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'http://localhost:23000';
     try {
       const plat = platform.toUpperCase() as PlatformType;
-      const baseUrl = process.env.OAUTH_REDIRECT_BASE_URL || process.env.CORS_ORIGIN || 'http://localhost:23000';
-      const defaultRedirect = `${baseUrl}/api/publishing/accounts/${platform.toLowerCase()}/callback`;
+      const defaultRedirect = this.getDefaultRedirect(platform);
       const account = await this.publishingService.handleOAuthCallback(
         plat,
         code,
         redirectUri || defaultRedirect,
       );
-      return res.redirect(`http://localhost:23000/publishing?accountConnected=${account.id}`);
+      return res.redirect(`${frontendUrl}/publishing?accountConnected=${account.id}`);
     } catch (err: any) {
       const errorMessage = encodeURIComponent(err.message || 'OAuth authorization failed.');
-      return res.redirect(`http://localhost:23000/publishing?error=${errorMessage}`);
+      return res.redirect(`${frontendUrl}/publishing?error=${errorMessage}`);
     }
   }
 

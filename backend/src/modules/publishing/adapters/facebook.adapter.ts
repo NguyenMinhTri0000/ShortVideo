@@ -23,14 +23,27 @@ export class FacebookAdapter implements PlatformAdapter {
     private readonly encryptionService: EncryptionService,
   ) {}
 
-  isConfigured(): boolean {
-    const appId =
+  getMissingConfig(): string[] {
+    const missing: string[] = [];
+    const appId = (
       this.configService.get<string>('FACEBOOK_CLIENT_ID') ||
-      this.configService.get<string>('FACEBOOK_APP_ID');
-    const appSecret =
+      this.configService.get<string>('FACEBOOK_APP_ID') ||
+      ''
+    ).trim();
+    const appSecret = (
       this.configService.get<string>('FACEBOOK_CLIENT_SECRET') ||
-      this.configService.get<string>('FACEBOOK_APP_SECRET');
-    return Boolean(appId && appSecret);
+      this.configService.get<string>('FACEBOOK_APP_SECRET') ||
+      ''
+    ).trim();
+
+    if (!appId) missing.push('FACEBOOK_APP_ID');
+    if (!appSecret) missing.push('FACEBOOK_APP_SECRET');
+
+    return missing;
+  }
+
+  isConfigured(): boolean {
+    return this.getMissingConfig().length === 0;
   }
 
   getAuthUrl(redirectUri: string, state = 'facebook_auth'): OAuthAuthUrlResult {
@@ -57,38 +70,49 @@ export class FacebookAdapter implements PlatformAdapter {
       throw new Error('Facebook app ID or secret is not configured.');
     }
 
-    const tokenRes = await axios.get(
-      `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${appSecret}&code=${code}`,
-    );
-
-    const userToken = tokenRes.data.access_token;
-    const expiresIn = tokenRes.data.expires_in || 5184000;
-
-    // Get Page Access Token
-    let accountId = 'facebook_page';
-    let accountName = 'Facebook Page';
-    let pageAccessToken = userToken;
-
     try {
+      const tokenRes = await axios.get(
+        `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${appSecret}&code=${code}`,
+      );
+
+      const userToken = tokenRes.data.access_token;
+      const expiresIn = tokenRes.data.expires_in || 5184000;
+
+      // Get Page Access Token from Graph API
       const pagesRes = await axios.get(
         `https://graph.facebook.com/v19.0/me/accounts?access_token=${userToken}`,
       );
-      const page = pagesRes.data?.data?.[0];
-      if (page) {
-        accountId = page.id;
-        accountName = page.name || accountName;
-        pageAccessToken = page.access_token || userToken;
-      }
-    } catch {
-      // Fallback
-    }
 
-    return {
-      accessToken: pageAccessToken,
-      expiresAt: new Date(Date.now() + expiresIn * 1000),
-      accountId,
-      accountName,
-    };
+      const pages = pagesRes.data?.data;
+      if (!Array.isArray(pages) || pages.length === 0) {
+        throw new Error(
+          'Facebook authorization succeeded, but no Facebook Page was found for this user account. A Facebook Page is required to publish Facebook Reels.',
+        );
+      }
+
+      const page = pages[0];
+      const accountId = page.id;
+      const accountName = page.name || 'Facebook Page';
+      const pageAccessToken = page.access_token || userToken;
+
+      if (!accountId || accountId === 'facebook_page') {
+        throw new Error('Could not resolve valid Facebook Page ID from user accounts.');
+      }
+
+      return {
+        accessToken: pageAccessToken,
+        expiresAt: new Date(Date.now() + expiresIn * 1000),
+        accountId,
+        accountName,
+      };
+    } catch (err: any) {
+      if (axios.isAxiosError(err) && err.response?.data?.error) {
+        const metaErr = err.response.data.error;
+        this.logger.error(`Facebook OAuth error: ${JSON.stringify(metaErr)}`);
+        throw new Error(`Facebook OAuth token exchange failed: ${metaErr.message || JSON.stringify(metaErr)}`);
+      }
+      throw err;
+    }
   }
 
   async publish(account: PlatformAccount, params: PublishParams): Promise<PublishResult> {

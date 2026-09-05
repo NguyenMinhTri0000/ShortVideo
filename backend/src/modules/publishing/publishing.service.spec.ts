@@ -182,4 +182,61 @@ describe('PublishingService', () => {
       });
     });
   });
+
+  describe('OAuth URL Generation & Validation', () => {
+    it('should throw detailed BadRequestException when platform is unconfigured', async () => {
+      mockTikTokAdapter.isConfigured.mockReturnValueOnce(false);
+      (mockTikTokAdapter as any).getMissingConfig = jest.fn().mockReturnValue(['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET']);
+
+      await expect(
+        service.getOAuthUrl('TIKTOK', 'http://localhost:23000/callback'),
+      ).rejects.toThrow('TIKTOK integration is not configured. Missing configuration: TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET');
+    });
+
+    it('should return OAuth auth URL when platform is configured', async () => {
+      mockTikTokAdapter.isConfigured.mockReturnValueOnce(true);
+      (mockTikTokAdapter as any).getAuthUrl = jest.fn().mockReturnValue({ url: 'https://www.tiktok.com/v2/auth/authorize/...' });
+
+      const res = await service.getOAuthUrl('TIKTOK', 'http://localhost:23000/callback');
+      expect(res).toEqual({ url: 'https://www.tiktok.com/v2/auth/authorize/...' });
+    });
+
+    it('should reject handleOAuthCallback if token exchange yields a dummy fallback accountId', async () => {
+      (mockFacebookAdapter as any).handleCallback = jest.fn().mockResolvedValue({
+        accessToken: 'user_token_123',
+        accountId: 'facebook_page',
+        accountName: 'Facebook Page',
+      });
+
+      await expect(
+        service.handleOAuthCallback('FACEBOOK', 'valid_code', 'http://localhost:23000/callback'),
+      ).rejects.toThrow('OAuth callback completed, but could not resolve a valid target FACEBOOK account identity.');
+    });
+
+    it('should create account upon valid handleOAuthCallback with real accountId', async () => {
+      (mockFacebookAdapter as any).handleCallback = jest.fn().mockResolvedValue({
+        accessToken: 'page_token_123',
+        accountId: 'real_page_id_999',
+        accountName: 'Official Fanpage',
+      });
+      mockPrismaService.platformAccount.create.mockResolvedValue({
+        id: 'acc-fb-1',
+        platform: 'FACEBOOK',
+        accountName: 'Official Fanpage',
+        accountId: 'real_page_id_999',
+        status: 'ACTIVE',
+      });
+
+      const account = await service.handleOAuthCallback('FACEBOOK', 'valid_code', 'http://localhost:23000/callback');
+      expect(account.id).toBe('acc-fb-1');
+      expect(mockPrismaService.platformAccount.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            platform: 'FACEBOOK',
+            accountId: 'real_page_id_999',
+          }),
+        }),
+      );
+    });
+  });
 });

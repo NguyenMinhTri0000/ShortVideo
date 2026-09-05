@@ -23,14 +23,27 @@ export class InstagramAdapter implements PlatformAdapter {
     private readonly encryptionService: EncryptionService,
   ) {}
 
-  isConfigured(): boolean {
-    const appId =
+  getMissingConfig(): string[] {
+    const missing: string[] = [];
+    const appId = (
       this.configService.get<string>('INSTAGRAM_CLIENT_ID') ||
-      this.configService.get<string>('FACEBOOK_APP_ID');
-    const appSecret =
+      this.configService.get<string>('FACEBOOK_APP_ID') ||
+      ''
+    ).trim();
+    const appSecret = (
       this.configService.get<string>('INSTAGRAM_CLIENT_SECRET') ||
-      this.configService.get<string>('FACEBOOK_APP_SECRET');
-    return Boolean(appId && appSecret);
+      this.configService.get<string>('FACEBOOK_APP_SECRET') ||
+      ''
+    ).trim();
+
+    if (!appId) missing.push('INSTAGRAM_CLIENT_ID (or FACEBOOK_APP_ID)');
+    if (!appSecret) missing.push('INSTAGRAM_CLIENT_SECRET (or FACEBOOK_APP_SECRET)');
+
+    return missing;
+  }
+
+  isConfigured(): boolean {
+    return this.getMissingConfig().length === 0;
   }
 
   getAuthUrl(redirectUri: string, state = 'instagram_auth'): OAuthAuthUrlResult {
@@ -58,42 +71,77 @@ export class InstagramAdapter implements PlatformAdapter {
       throw new Error('Instagram app ID or secret is not configured.');
     }
 
-    const tokenRes = await axios.get(
-      `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${appSecret}&code=${code}`,
-    );
-
-    const accessToken = tokenRes.data.access_token;
-    const expiresIn = tokenRes.data.expires_in || 5184000; // ~60 days for long-lived Meta tokens
-
-    // Retrieve Instagram Business account ID
-    let accountId = 'instagram_account';
-    let accountName = 'Instagram Account';
-
     try {
+      const tokenRes = await axios.get(
+        `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${appSecret}&code=${code}`,
+      );
+
+      const accessToken = tokenRes.data.access_token;
+      const expiresIn = tokenRes.data.expires_in || 5184000;
+
+      // 1. Fetch user's Facebook pages
       const meRes = await axios.get(
         `https://graph.facebook.com/v19.0/me/accounts?access_token=${accessToken}`,
       );
-      const page = meRes.data?.data?.[0];
-      if (page) {
+
+      const pages = meRes.data?.data;
+      if (!Array.isArray(pages) || pages.length === 0) {
+        throw new Error(
+          'Instagram connection failed: No Facebook Page was found for this Meta account. Instagram Business publishing requires a Facebook Page linked to an Instagram Professional account.',
+        );
+      }
+
+      // 2. Search pages for a connected Instagram Business/Creator Account
+      let accountId: string | null = null;
+      let accountName = 'Instagram Account';
+
+      for (const page of pages) {
         const pageId = page.id;
         const igRes = await axios.get(
           `https://graph.facebook.com/v19.0/${pageId}?fields=instagram_business_account,name&access_token=${accessToken}`,
         );
-        if (igRes.data?.instagram_business_account?.id) {
-          accountId = igRes.data.instagram_business_account.id;
-          accountName = `@${igRes.data.name || 'ig_user'}`;
+
+        const igBusinessId = igRes.data?.instagram_business_account?.id;
+        if (igBusinessId) {
+          accountId = igBusinessId;
+          
+          // Fetch real Instagram username
+          try {
+            const igUserRes = await axios.get(
+              `https://graph.facebook.com/v19.0/${igBusinessId}?fields=username,name&access_token=${accessToken}`,
+            );
+            if (igUserRes.data?.username) {
+              accountName = `@${igUserRes.data.username}`;
+            } else {
+              accountName = `@${igRes.data.name || 'ig_user'}`;
+            }
+          } catch {
+            accountName = `@${igRes.data.name || 'ig_user'}`;
+          }
+          break;
         }
       }
-    } catch {
-      // Fallback
-    }
 
-    return {
-      accessToken,
-      expiresAt: new Date(Date.now() + expiresIn * 1000),
-      accountId,
-      accountName,
-    };
+      if (!accountId || accountId === 'instagram_account') {
+        throw new Error(
+          'Instagram authorization succeeded, but no Instagram Professional (Business or Creator) account was found linked to your Facebook Page(s). Please connect an Instagram Professional account to a Facebook Page in Meta Business Suite.',
+        );
+      }
+
+      return {
+        accessToken,
+        expiresAt: new Date(Date.now() + expiresIn * 1000),
+        accountId,
+        accountName,
+      };
+    } catch (err: any) {
+      if (axios.isAxiosError(err) && err.response?.data?.error) {
+        const metaErr = err.response.data.error;
+        this.logger.error(`Instagram OAuth error: ${JSON.stringify(metaErr)}`);
+        throw new Error(`Instagram OAuth token exchange failed: ${metaErr.message || JSON.stringify(metaErr)}`);
+      }
+      throw err;
+    }
   }
 
   async publish(account: PlatformAccount, params: PublishParams): Promise<PublishResult> {

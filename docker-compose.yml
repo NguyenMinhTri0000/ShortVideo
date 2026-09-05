@@ -45,6 +45,11 @@ services:
       - postgres
       - redis
       - minio
+    env_file:
+      - path: ./backend/.env
+        required: false
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:25432/videotool?schema=public"
       REDIS_HOST: "127.0.0.1"
@@ -59,8 +64,19 @@ services:
       MINIO_SECRET_KEY: "minioadmin"
       MINIO_BUCKET_NAME: "videos"
       PORT: 23001
-      YOUTUBE_CLIENT_ID: ""
-      YOUTUBE_CLIENT_SECRET: ""
+      YOUTUBE_CLIENT_ID: "${YOUTUBE_CLIENT_ID}"
+      YOUTUBE_CLIENT_SECRET: "${YOUTUBE_CLIENT_SECRET}"
+      YOUTUBE_REDIRECT_URI: "${YOUTUBE_REDIRECT_URI}"
+      TIKTOK_CLIENT_KEY: "${TIKTOK_CLIENT_KEY}"
+      TIKTOK_CLIENT_ID: "${TIKTOK_CLIENT_ID}"
+      TIKTOK_CLIENT_SECRET: "${TIKTOK_CLIENT_SECRET}"
+      TIKTOK_REDIRECT_URI: "${TIKTOK_REDIRECT_URI}"
+      FACEBOOK_APP_ID: "${FACEBOOK_APP_ID}"
+      FACEBOOK_APP_SECRET: "${FACEBOOK_APP_SECRET}"
+      FACEBOOK_REDIRECT_URI: "${FACEBOOK_REDIRECT_URI}"
+      INSTAGRAM_CLIENT_ID: "${INSTAGRAM_CLIENT_ID}"
+      INSTAGRAM_CLIENT_SECRET: "${INSTAGRAM_CLIENT_SECRET}"
+      INSTAGRAM_REDIRECT_URI: "${INSTAGRAM_REDIRECT_URI}"
     volumes:
       - ./engine:/app/engine
       - ./storage:/app/storage

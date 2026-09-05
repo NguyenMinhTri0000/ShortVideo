@@ -119,12 +119,24 @@ export class PublishingService {
 
   // --- ACCOUNTS MANAGEMENT ---
 
+  async getConfigStatus() {
+    const status: Record<string, { isConfigured: boolean; missing: string[] }> = {};
+    for (const [platform, adapter] of this.adapters.entries()) {
+      status[platform] = {
+        isConfigured: adapter.isConfigured(),
+        missing: adapter.getMissingConfig ? adapter.getMissingConfig() : [],
+      };
+    }
+    return status;
+  }
+
   async createAccount(dto: CreateAccountDto) {
     const encryptedAccess = this.encryptionService.encrypt(dto.accessToken);
     const encryptedRefresh = this.encryptionService.encrypt(dto.refreshToken);
 
     const isAdapterConfigured = this.getAdapter(dto.platform.toUpperCase() as PlatformType).isConfigured();
-    const status = isAdapterConfigured ? 'ACTIVE' : 'NOT_CONFIGURED';
+    const hasToken = Boolean(dto.accessToken && dto.accessToken.trim());
+    const status = hasToken || isAdapterConfigured ? 'ACTIVE' : 'NOT_CONFIGURED';
 
     const account = await this.prisma.platformAccount.create({
       data: {
@@ -177,6 +189,12 @@ export class PublishingService {
   async getOAuthUrl(platform: PlatformType, redirectUri: string) {
     const adapter = this.getAdapter(platform);
     if (!adapter.isConfigured()) {
+      const missingKeys = adapter.getMissingConfig ? adapter.getMissingConfig() : [];
+      if (missingKeys.length > 0) {
+        throw new BadRequestException(
+          `${platform} integration is not configured. Missing configuration: ${missingKeys.join(', ')}`,
+        );
+      }
       throw new BadRequestException(`API credentials for ${platform} are not configured in backend.`);
     }
     if (!adapter.getAuthUrl) {
@@ -192,6 +210,13 @@ export class PublishingService {
     }
 
     const tokenResult = await adapter.handleCallback(code, redirectUri);
+    const dummyIds = ['facebook_page', 'instagram_account', 'tiktok_user', 'youtube_channel'];
+    if (!tokenResult.accountId || dummyIds.includes(tokenResult.accountId)) {
+      throw new BadRequestException(
+        `OAuth callback completed, but could not resolve a valid target ${platform} account identity.`,
+      );
+    }
+
     return this.createAccount({
       platform,
       accountName: tokenResult.accountName || `${platform} Account`,

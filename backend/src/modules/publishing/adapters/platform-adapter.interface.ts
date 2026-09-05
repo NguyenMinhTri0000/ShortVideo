@@ -60,6 +60,7 @@ export interface OAuthTokenResult {
 export interface PlatformAdapter {
   readonly platform: PlatformType;
   isConfigured(): boolean;
+  getMissingConfig?(): string[];
   publish(account: PlatformAccount, params: PublishParams): Promise<PublishResult>;
   getPostStatus(account: PlatformAccount, platformPostId: string): Promise<PublishResult>;
   fetchAnalytics(account: PlatformAccount, platformPostId: string): Promise<PlatformMetrics>;
