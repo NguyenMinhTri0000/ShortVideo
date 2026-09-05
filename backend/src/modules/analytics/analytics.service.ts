@@ -351,4 +351,93 @@ export class AnalyticsService {
       })),
     };
   }
+
+  async getContentInsights() {
+    const publishedJobs = await this.prisma.publishJob.findMany({
+      where: { status: 'PUBLISHED' },
+      include: {
+        video: {
+          include: {
+            idea: {
+              include: {
+                product: {
+                  include: {
+                    contentIdeas: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        analyticsSnapshots: {
+          orderBy: { collectedAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    const angleStats: Record<string, { views: number; count: number; likes: number }> = {};
+    let totalViews = 0;
+    let totalPosts = 0;
+
+    for (const job of publishedJobs) {
+      const snap = job.analyticsSnapshots[0];
+      const views = snap ? Number(snap.views) : 0;
+      const likes = snap ? snap.likes : 0;
+      totalViews += views;
+      totalPosts++;
+
+      // Match angle/contentType from associated idea or product
+      const idea = job.video?.idea;
+      const matchedIdea = idea?.product?.contentIdeas.find(
+        (ci) => ci.title === idea.title || idea.description?.includes(ci.marketingAngle),
+      );
+
+      const angleKey = matchedIdea?.contentType || matchedIdea?.marketingAngle || 'product_review';
+
+      if (!angleStats[angleKey]) {
+        angleStats[angleKey] = { views: 0, count: 0, likes: 0 };
+      }
+      angleStats[angleKey].views += views;
+      angleStats[angleKey].count += 1;
+      angleStats[angleKey].likes += likes;
+    }
+
+    const overallAvgViews = totalPosts > 0 ? totalViews / totalPosts : 0;
+
+    const angleInsights = Object.entries(angleStats).map(([angle, stats]) => {
+      const avgViews = stats.count > 0 ? Math.round(stats.views / stats.count) : 0;
+      const performanceMultiplier = overallAvgViews > 0 ? Number((avgViews / overallAvgViews).toFixed(2)) : 1;
+
+      return {
+        contentType: angle,
+        totalPosts: stats.count,
+        totalViews: stats.views,
+        avgViews,
+        performanceMultiplier,
+        recommendation:
+          performanceMultiplier >= 1.2
+            ? `Góc nhìn "${angle}" đạt trung bình ${avgViews.toLocaleString()} lượt xem (${Math.round((performanceMultiplier - 1) * 100)}% cao hơn trung bình). Khuyên dùng tiếp tục nhân bản!`
+            : `Góc nhìn "${angle}" đang đạt mức hiệu suất bình thường (${avgViews.toLocaleString()} views/video).`,
+      };
+    });
+
+    angleInsights.sort((a, b) => b.avgViews - a.avgViews);
+
+    const topAngle = angleInsights[0];
+
+    return {
+      totalPostsAnalyzed: totalPosts,
+      totalViewsAnalyzed: totalViews,
+      overallAvgViews: Math.round(overallAvgViews),
+      topPerformingAngle: topAngle ? topAngle.contentType : 'product_review',
+      insights: angleInsights,
+      recommendedNextSteps: topAngle
+        ? [
+            `Tập trung tạo thêm 3-5 video mới sử dụng định dạng nội dung "${topAngle.contentType}".`,
+            `Thử nghiệm kết hợp Hook mở đầu của video hot nhất với sản phẩm cùng danh mục.`,
+          ]
+        : ['Tiếp tục đăng thêm video để hệ thống tích lũy đủ dữ liệu phân tích.'],
+    };
+  }
 }

@@ -345,6 +345,54 @@ Target Audience: ${product.targetAudience || 'N/A'}
     };
   }
 
+  /**
+   * Batch Video Generation:
+   * Accepts product ID, optional list of contentIdeaIds (or takes top N priority ideas),
+   * and triggers video generation jobs for all selected ideas concurrently.
+   */
+  async batchGenerateVideosFromIdeas(
+    productId: string,
+    ideaIds?: string[],
+    config: VideoJobConfig = {},
+    limit = 3,
+  ) {
+    let targetIdeaIds = ideaIds && ideaIds.length > 0 ? ideaIds : [];
+
+    if (targetIdeaIds.length === 0) {
+      const topIdeas = await this.prisma.contentIdea.findMany({
+        where: { productId },
+        orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+        take: limit,
+      });
+      targetIdeaIds = topIdeas.map((idea) => idea.id);
+    }
+
+    if (targetIdeaIds.length === 0) {
+      throw new BadRequestException('Không tìm thấy ý tưởng nội dung nào để tạo video');
+    }
+
+    this.logger.log(
+      `[ContentStrategy] Starting batch video generation for ${targetIdeaIds.length} content ideas (productId=${productId})`,
+    );
+
+    const results = [];
+    for (const id of targetIdeaIds) {
+      try {
+        const result = await this.generateVideoFromIdea(id, config);
+        results.push(result);
+      } catch (err) {
+        this.logger.error(`[ContentStrategy] Batch generate failed for idea ${id}: ${err}`);
+      }
+    }
+
+    return {
+      success: true,
+      count: results.length,
+      jobs: results.map((r) => r.job),
+      ideas: results.map((r) => r.contentIdea),
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // Helper methods
   // ---------------------------------------------------------------------------

@@ -42,4 +42,17 @@ export class ContentStrategyController {
   ) {
     return this.contentStrategyService.generateVideoFromIdea(id, config);
   }
+
+  @Post('products/:id/content-ideas/batch-generate-videos')
+  batchGenerateVideos(
+    @Param('id') productId: string,
+    @Body() body: { ideaIds?: string[]; limit?: number; config?: VideoJobConfig } = {},
+  ) {
+    return this.contentStrategyService.batchGenerateVideosFromIdeas(
+      productId,
+      body.ideaIds,
+      body.config || {},
+      body.limit || 3,
+    );
+  }
 }

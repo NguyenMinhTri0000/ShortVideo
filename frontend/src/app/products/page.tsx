@@ -310,6 +310,20 @@ export default function ProductsPage() {
     }
   };
 
+  const handleBatchGenerateVideos = async (productId: string, limit = 3) => {
+    try {
+      setIsGeneratingIdeas(true);
+      const res = await api.post(`/products/${productId}/content-ideas/batch-generate-videos`, { limit });
+      alert(`Thành công! Đã tự động kích hoạt tạo ${res.data.count} Job video từ các góc nhìn xuất sắc nhất.`);
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["content-ideas", selectedProduct?.id] });
+    } catch (err: any) {
+      alert("Lỗi tạo video hàng loạt: " + (err.response?.data?.message || err.message));
+    } finally {
+      setIsGeneratingIdeas(false);
+    }
+  };
+
   const handleGenerateVideoFromIdea = async (ideaId: string) => {
     try {
       setSelectedIdeaForVideoId(ideaId);
@@ -1357,18 +1371,34 @@ export default function ProductsPage() {
                         Tự động phân tích từ dữ liệu nghiên cứu sản phẩm để đề xuất 10-20 góc khai thác video độc đáo trước khi tạo kịch bản.
                       </p>
                     </div>
-                    <button
-                      onClick={() => handleGenerateContentIdeas(selectedProduct.id)}
-                      disabled={isGeneratingIdeas}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-600/20 shrink-0 transition-all"
-                    >
-                      {isGeneratingIdeas ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Zap className="w-4 h-4" />
+                    <div className="flex items-center gap-2 shrink-0">
+                      {contentIdeas.length > 0 && (
+                        <button
+                          onClick={() => handleBatchGenerateVideos(selectedProduct.id, 3)}
+                          disabled={isGeneratingIdeas}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-violet-600/20 transition-all"
+                        >
+                          {isGeneratingIdeas ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Video className="w-4 h-4" />
+                          )}
+                          Tạo 3 Video Hàng Loạt
+                        </button>
                       )}
-                      {contentIdeas.length > 0 ? "Tạo Lại 10-20 Ý Tưởng Mới" : "Tạo Ý Tưởng Nội Dung (AI)"}
-                    </button>
+                      <button
+                        onClick={() => handleGenerateContentIdeas(selectedProduct.id)}
+                        disabled={isGeneratingIdeas}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-600/20 transition-all"
+                      >
+                        {isGeneratingIdeas ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Zap className="w-4 h-4" />
+                        )}
+                        {contentIdeas.length > 0 ? "Tạo Lại 10-20 Ý Tưởng Mới" : "Tạo Ý Tưởng Nội Dung (AI)"}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Ideas List */}

@@ -11,7 +11,7 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { PublishingService, CreateAccountDto, CreatePublishJobDto } from './publishing.service';
+import { PublishingService, CreateAccountDto, CreatePublishJobDto, CreateBatchPublishJobsDto } from './publishing.service';
 import { PlatformType } from './adapters/platform-adapter.interface';
 
 @Controller('publishing')
@@ -121,6 +121,11 @@ export class PublishingController {
   @Post('jobs')
   async createJob(@Body() dto: CreatePublishJobDto) {
     return this.publishingService.createJob(dto);
+  }
+
+  @Post('jobs/batch')
+  async createBatchJobs(@Body() dto: CreateBatchPublishJobsDto) {
+    return this.publishingService.createBatchJobs(dto);
   }
 
   @Get('jobs')

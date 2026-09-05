@@ -225,36 +225,37 @@ export default function PublishingDashboard() {
     }
 
     setSubmitting(true);
-    let successCount = 0;
-    const errorMsgs: string[] = [];
-
-    for (const accId of selectedAccounts) {
-      try {
-        await api.post("/publishing/jobs", {
-          videoId: selectedVideoId,
-          platformAccountId: accId,
-          title,
-          caption,
-          hashtags: hashtags.split(" ").filter(Boolean),
-          privacyStatus,
-          scheduledAt: publishMode === "SCHEDULE" && scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
-        });
-        successCount++;
-      } catch (err: any) {
-        errorMsgs.push(err.response?.data?.message || `Failed for account ${accId}`);
-      }
-    }
-
-    setSubmitting(false);
-
-    if (successCount > 0) {
-      setActionMessage({
-        type: "success",
-        text: `Successfully created ${successCount} publishing job(s)!`,
+    try {
+      const res = await api.post("/publishing/jobs/batch", {
+        videoId: selectedVideoId,
+        platformAccountIds: selectedAccounts,
+        title,
+        caption,
+        hashtags: hashtags.split(" ").filter(Boolean),
+        privacyStatus,
+        scheduledAt: publishMode === "SCHEDULE" && scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
       });
-      fetchData();
-    } else {
-      setActionMessage({ type: "error", text: errorMsgs.join(" | ") || "Failed to create publish jobs." });
+
+      const count = res.data?.count || 0;
+      if (count > 0) {
+        setActionMessage({
+          type: "success",
+          text: `Đã tạo thành công ${count} lịch đăng video trên các kênh social đã chọn!`,
+        });
+        fetchData();
+      } else {
+        setActionMessage({
+          type: "error",
+          text: res.data?.errors?.[0]?.message || "Không thể tạo công việc đăng video.",
+        });
+      }
+    } catch (err: any) {
+      setActionMessage({
+        type: "error",
+        text: err.response?.data?.message || "Lỗi khi gửi yêu cầu đăng video hàng loạt.",
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
 

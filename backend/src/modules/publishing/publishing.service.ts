@@ -86,6 +86,45 @@ export class CreatePublishJobDto {
   allowDuplicate?: boolean;
 }
 
+export class CreateBatchPublishJobsDto {
+  @IsString()
+  videoId!: string;
+
+  @IsArray()
+  platformAccountIds!: string[];
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  caption?: string;
+
+  @IsOptional()
+  @IsArray()
+  hashtags?: string[];
+
+  @IsOptional()
+  @IsArray()
+  tags?: string[];
+
+  @IsOptional()
+  @IsString()
+  privacyStatus?: string;
+
+  @IsOptional()
+  scheduledAt?: Date | string;
+
+  @IsOptional()
+  @IsBoolean()
+  allowDuplicate?: boolean;
+}
+
 
 @Injectable()
 export class PublishingService {
@@ -300,6 +339,42 @@ export class PublishingService {
 
     this.logger.log(`Created publish job ${job.id} for platform ${account.platform} (Status: ${initialStatus}, Delay: ${delayMs}ms)`);
     return job;
+  }
+
+  async createBatchJobs(dto: CreateBatchPublishJobsDto) {
+    if (!dto.platformAccountIds || dto.platformAccountIds.length === 0) {
+      throw new BadRequestException('Vui lòng chọn ít nhất một tài khoản mạng xã hội để đăng video');
+    }
+
+    const createdJobs = [];
+    const errors = [];
+
+    for (const accountId of dto.platformAccountIds) {
+      try {
+        const job = await this.createJob({
+          videoId: dto.videoId,
+          platformAccountId: accountId,
+          title: dto.title,
+          description: dto.description,
+          caption: dto.caption,
+          hashtags: dto.hashtags,
+          tags: dto.tags,
+          privacyStatus: dto.privacyStatus,
+          scheduledAt: dto.scheduledAt,
+          allowDuplicate: dto.allowDuplicate,
+        });
+        createdJobs.push(job);
+      } catch (err: any) {
+        errors.push({ accountId, message: err.message || String(err) });
+      }
+    }
+
+    return {
+      success: createdJobs.length > 0,
+      count: createdJobs.length,
+      jobs: createdJobs,
+      errors,
+    };
   }
 
   async getJobById(id: string) {

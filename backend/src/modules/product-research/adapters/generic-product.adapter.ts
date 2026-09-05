@@ -167,26 +167,13 @@ export class GenericProductAdapter extends ProductSourceAdapter {
         throw new Error(`URL không trỏ đến trang HTML (content-type: ${contentType})`);
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('Không thể đọc nội dung trang');
-
-      const chunks: Uint8Array[] = [];
-      let totalBytes = 0;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        totalBytes += value.byteLength;
-        if (totalBytes > MAX_RESPONSE_BYTES) {
-          reader.cancel();
-          throw new Error('Trang sản phẩm quá lớn (vượt quá 8MB)');
-        }
-        chunks.push(value);
+      const arrayBuffer = await response.arrayBuffer();
+      if (arrayBuffer.byteLength > MAX_RESPONSE_BYTES) {
+        throw new Error('Trang sản phẩm quá lớn (vượt quá 8MB)');
       }
 
       const decoder = new TextDecoder('utf-8', { fatal: false });
-      return decoder.decode(Buffer.concat(chunks));
+      return decoder.decode(arrayBuffer);
     } catch (error: unknown) {
       if (error instanceof Error) {
         if (error.name === 'AbortError') {

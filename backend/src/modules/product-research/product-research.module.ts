@@ -9,6 +9,7 @@ import { LlmModule } from '../llm/llm.module';
 import { DatabaseModule } from '../database/database.module';
 
 import { AssetDiscoveryService } from './asset-discovery.service';
+import { UrlResolverService } from './url-resolver.service';
 
 @Module({
   imports: [
@@ -25,12 +26,14 @@ import { AssetDiscoveryService } from './asset-discovery.service';
     ContentBriefService,
     ProductResearchProcessor,
     AssetDiscoveryService,
+    UrlResolverService,
   ],
   exports: [
     ProductResearchService,
     ProductAnalysisService,
     ContentBriefService,
     AssetDiscoveryService,
+    UrlResolverService,
   ],
 })
 export class ProductResearchModule {}

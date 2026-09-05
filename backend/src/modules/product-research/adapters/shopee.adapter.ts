@@ -20,9 +20,12 @@ export class ShopeeAdapter extends ProductSourceAdapter {
       const parsed = new URL(url);
       const host = parsed.hostname.toLowerCase();
       return (
-        host.includes('shopee.vn') ||
-        host.includes('shopee.com') ||
-        host.includes('shp.ee')
+        host === 'shopee.vn' ||
+        host.endsWith('.shopee.vn') ||
+        host === 'shopee.com' ||
+        host.endsWith('.shopee.com') ||
+        host === 'shp.ee' ||
+        host.endsWith('.shp.ee')
       );
     } catch {
       return false;

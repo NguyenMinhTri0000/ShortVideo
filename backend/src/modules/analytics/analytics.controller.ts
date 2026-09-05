@@ -22,6 +22,11 @@ export class AnalyticsController {
     });
   }
 
+  @Get('insights')
+  async getContentInsights() {
+    return this.analyticsService.getContentInsights();
+  }
+
   @Get('top-performing')
   async getTopPerforming(
     @Query('platform') platform?: string,

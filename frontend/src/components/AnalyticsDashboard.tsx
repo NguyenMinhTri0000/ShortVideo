@@ -54,9 +54,26 @@ interface TopVideo {
   engagementRate: number;
 }
 
+interface InsightsData {
+  totalPostsAnalyzed: number;
+  totalViewsAnalyzed: number;
+  overallAvgViews: number;
+  topPerformingAngle: string;
+  insights: Array<{
+    contentType: string;
+    totalPosts: number;
+    totalViews: number;
+    avgViews: number;
+    performanceMultiplier: number;
+    recommendation: string;
+  }>;
+  recommendedNextSteps: string[];
+}
+
 export default function AnalyticsDashboard() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [topVideos, setTopVideos] = useState<TopVideo[]>([]);
+  const [insights, setInsights] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Filters
@@ -78,8 +95,11 @@ export default function AnalyticsDashboard() {
       topParams.append("limit", "5");
       const topRes = await api.get(`/analytics/top-performing?${topParams.toString()}`);
 
+      const insightsRes = await api.get("/analytics/insights").catch(() => null);
+
       setOverview(overviewRes.data);
       setTopVideos(topRes.data || []);
+      if (insightsRes?.data) setInsights(insightsRes.data);
     } catch (err: any) {
       console.error("Failed to load analytics:", err);
     } finally {
@@ -173,6 +193,38 @@ export default function AnalyticsDashboard() {
           </select>
         </div>
       </div>
+
+      {/* Smart Content Insights & Strategy Recommendations Banner */}
+      {insights && insights.insights.length > 0 && (
+        <div className="bg-gradient-to-r from-violet-950/40 via-purple-950/30 to-indigo-950/40 border border-violet-800/40 rounded-xl p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-violet-400" />
+              <h2 className="text-sm font-bold text-violet-200 uppercase tracking-wide">
+                Smart Content Decision Engine
+              </h2>
+            </div>
+            <span className="text-[10px] bg-violet-500/20 text-violet-300 px-2 py-0.5 rounded border border-violet-500/30">
+              AI Insight
+            </span>
+          </div>
+
+          <p className="text-xs text-zinc-300">
+            {insights.insights[0]?.recommendation || "Hệ thống đang theo dõi hiệu suất video để đưa ra gợi ý kịch bản tối ưu."}
+          </p>
+
+          {insights.recommendedNextSteps && insights.recommendedNextSteps.length > 0 && (
+            <div className="bg-zinc-950/60 rounded-lg p-3 border border-violet-900/30 space-y-1">
+              <span className="text-[10px] font-semibold text-violet-400 uppercase tracking-wider">Khuyến nghị tiếp theo:</span>
+              <ul className="text-xs text-zinc-300 space-y-1 list-disc list-inside">
+                {insights.recommendedNextSteps.map((step, idx) => (
+                  <li key={idx}>{step}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Top Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">

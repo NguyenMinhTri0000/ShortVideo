@@ -19,20 +19,24 @@ import type {
 } from './types/product-research.types';
 import { ResearchStatus } from './types/product-research.types';
 import { AssetDiscoveryService } from './asset-discovery.service';
+import { UrlResolverService } from './url-resolver.service';
 
 @Injectable()
 export class ProductResearchService {
   private readonly logger = new Logger(ProductResearchService.name);
   private readonly adapters: ProductSourceAdapter[];
+  private readonly resolver: UrlResolverService;
 
   constructor(
     private prisma: PrismaService,
     private productAnalysisService: ProductAnalysisService,
     private contentBriefService: ContentBriefService,
     private assetDiscoveryService: AssetDiscoveryService,
+    private urlResolverService?: UrlResolverService,
     @InjectQueue('product-research')
     private researchQueue?: Queue<ProductResearchJobPayload>,
   ) {
+    this.resolver = urlResolverService || new UrlResolverService();
     // Platform adapters registered in priority order before generic fallback
     this.adapters = [
       new ShopeeAdapter(),
@@ -55,7 +59,12 @@ export class ProductResearchService {
     }
 
     const cleanedUrl = url.trim();
-    const adapter = this.selectAdapter(cleanedUrl);
+
+    // Resolve & normalize URL before adapter selection
+    const resolved = await this.resolver.resolveAndNormalizeUrl(cleanedUrl);
+    const targetUrl = resolved.canonicalUrl || resolved.finalUrl;
+    const adapter = this.selectAdapter(targetUrl) || this.selectAdapter(cleanedUrl);
+
     if (!adapter) {
       return {
         success: false,
@@ -71,7 +80,7 @@ export class ProductResearchService {
       data: {
         name: 'Đang nghiên cứu sản phẩm...',
         affiliateUrl: cleanedUrl,
-        sourceUrl: cleanedUrl,
+        sourceUrl: targetUrl,
         sourcePlatform: adapter.name,
         researchStatus: ResearchStatus.PENDING,
       },
@@ -134,17 +143,24 @@ export class ProductResearchService {
       data: { researchStatus: ResearchStatus.PROCESSING, researchError: null },
     });
 
-    const adapter = this.selectAdapter(url);
+    const resolved = await this.resolver.resolveAndNormalizeUrl(url);
+    const targetUrl = resolved.canonicalUrl || resolved.finalUrl;
+    const adapter = this.selectAdapter(targetUrl) || this.selectAdapter(url);
+
     if (!adapter) {
-      throw new Error(`No adapter found for URL: ${url}`);
+      throw new Error(`No adapter found for URL: ${targetUrl}`);
     }
 
     try {
       // Step 1: Extraction
-      this.logger.log(`[Extract] Adapter "${adapter.name}" extracting from ${url}`);
-      const rawData: RawProductData = await adapter.extract(url);
+      const platformName = adapter.name === 'shopee' ? 'Shopee' : adapter.name;
+      this.logger.log(`[ProductResearch] Starting ${platformName} product extraction...`);
+      const rawData: RawProductData = await adapter.extract(targetUrl);
 
       if (!rawData.title && !rawData.description && rawData.images.length === 0) {
+        if (resolved.platform === 'shopee') {
+          throw new Error('Shopee product URL was resolved, but shop ID/item ID could not be extracted.');
+        }
         throw new Error(
           'Không thể trích xuất thông tin sản phẩm từ trang này. Trang có thể bị chặn hoặc không có nội dung.',
         );
@@ -199,7 +215,7 @@ export class ProductResearchService {
           rating: rawData.rating || null,
           reviewCount: rawData.reviewCount || null,
           affiliateUrl: url,
-          sourceUrl: url,
+          sourceUrl: targetUrl,
           sourcePlatform: adapter.name,
           images: rawData.images || [],
           videos: rawData.videos || [],
