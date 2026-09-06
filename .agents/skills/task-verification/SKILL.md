@@ -32,8 +32,15 @@ This skill enforces the **Verification Gate**—the most critical quality checkp
 4. **Automated Unit & Integration Tests Pass**:
    - Relevant test commands pass with exit code `0` (e.g. `npm test`, `jest`, `pytest`).
 
-5. **Build, Typecheck, and Lint Cleanliness**:
-   - No compiler, typechecking, or linter errors introduced (e.g. `tsc --noEmit`, `eslint`, `flake8`, `mypy`).
+5. **Build, Typecheck, and Baseline-Aware Lint Cleanliness**:
+   - Compiler (`nest build`, `next build`) and typechecking (`tsc --noEmit`) MUST exit with `0`.
+   - **Baseline-Aware Lint Rule** (Refer to `.ai/baseline.md`):
+     - Official Repository Baseline: **833 ESLint errors** (Pre-existing Technical Debt).
+     - Current total errors `== 833` → PASS (No regression).
+     - Current total errors `< 833` → PASS (Quality improvement).
+     - Current total errors `> 833` → FAIL (New lint error / regression introduced).
+     - **Diff Scope Audit**: Active task diff MUST NOT introduce any new linter errors in touched files.
+     - **Strict Prohibition**: Agents MUST NOT disable ESLint rules, reduce severity, or add `eslint-disable` comments to artificially pass lint checks.
 
 6. **Zero Regression Guarantee**:
    - Existing unrelated features and services compile and run without side effects.

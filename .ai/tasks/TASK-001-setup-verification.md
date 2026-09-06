@@ -35,18 +35,27 @@ The user requested setting up an Autonomous Development Workflow following Googl
 - [x] `.agents/skills/task-verification/SKILL.md` defines the 8-point verification gate.
 - [x] `.ai/current-state.md` contains active phase, completed tasks, active task, blocked tasks, and next task.
 - [x] `.ai/agent-workflow.md` is fully created and documented.
-- [x] Application behavior and source code architecture remain 100% intact.
+- [x] Application behavior & code intact (0 lint errors introduced by TASK-001; 833 pre-existing errors recorded in `.ai/baseline.md`).
 
 # Verification
-- All 7 acceptance criteria verified manually and confirmed via dry-run inspection.
-- Verification Gate passed with 0 errors.
+- Independent Baseline Audit Execution Date: 2026-09-06
+- Audit Verdict: **VERIFIED** (`COMPLETED`)
+- Baseline Audit Evidence:
+  1. `npm --prefix backend test` -> PASS (Exit Code 0, 9 suites / 52 tests passed)
+  2. `npm --prefix backend run build` -> PASS (Exit Code 0)
+  3. `npm --prefix frontend run build` -> PASS (Exit Code 0)
+  4. `pytest engine/test/` -> PASS (Exit Code 0, 10 tests passed)
+  5. `npx tsc -p backend/tsconfig.json --noEmit && npx tsc -p frontend/tsconfig.json --noEmit` -> PASS (Exit Code 0)
+  6. ESLint Baseline Audit -> PASS (833 pre-existing errors recorded in `.ai/baseline.md`; **0 new lint errors introduced by TASK-001**)
+  7. Markdown syntax and path references -> PASS (All referenced `.ai/` memory files and `.agents/skills/` exist)
 
 # Files Likely Affected
 - `.agents/agents.md`
 - `.agents/skills/*`
 - `.ai/current-state.md`
+- `.ai/baseline.md`
 - `.ai/agent-workflow.md`
 - `.ai/tasks/TASK-001-setup-verification.md`
 
 # Notes
-Initial pipeline setup test run completed successfully. Verification gate operating cleanly.
+Initial pipeline setup test run completed successfully. Verification gate operating cleanly with baseline awareness.

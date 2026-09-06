@@ -14,7 +14,13 @@
   - `TASK-000`: Setup Repository Structure & AI Memory (`.ai/`)
   - `TASK-001`: Verify Autonomous Development Workflow Setup (`.ai/tasks/TASK-001-setup-verification.md`)
 - **Blocked Tasks**: None
-- **Next Recommended Task**: Ready for new roadmap tasks in `.ai/tasks/`
+- **Next Recommended Task**: `TASK-002`: Clean up existing ESLint technical debt (`.ai/tasks/TASK-002-cleanup-eslint-tech-debt.md`)
+
+---
+
+## Code Quality Baselines & Technical Debt
+- **Official ESLint Baseline**: **833 Errors** (Backend: 806, Frontend: 27) — Documented in [.ai/baseline.md](file:///home/tringuyen/Code/short-video/.ai/baseline.md).
+- **Verification Rule**: Zero-regression policy enforced (`Current Errors <= 833`). Unrelated tasks are unblocked while TASK-002 tracks debt cleanup.
 
 ---
 
@@ -27,11 +33,8 @@
 
 ---
 
-## Known Issues & Debt
-- None reported.
-
----
-
 ## Latest Changes
-- Completed setup and empirical test run of the Google Antigravity Autonomous Development Workflow (`TASK-001`).
-- All agent roles, reusable skills, task schemas, dependency engine rules, verification gate logic, and documentation (`.ai/agent-workflow.md`) are active and verified.
+- Verified and marked `TASK-001` as `COMPLETED`. Independent baseline audit confirmed 0 lint errors introduced by TASK-001.
+- Created `.ai/baseline.md` to record 833 pre-existing ESLint errors as technical debt.
+- Updated `.agents/skills/task-verification/SKILL.md` with baseline-aware verification rules.
+- Created `TASK-002` for future ESLint technical debt refactoring.
