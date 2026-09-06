@@ -98,13 +98,40 @@ export class LlmService {
                         ? 'volcengine_model_name'
                         : null;
 
+    const rawModel = modelKey
+      ? await this.getSetting(modelKey, '')
+      : await this.getSetting('llm_model', 'gemini-2.0-flash');
+
+    const sanitizedModel = this.sanitizeModelName(provider, rawModel);
+
+    if (modelKey && rawModel !== sanitizedModel) {
+      this.prisma.systemSetting
+        .upsert({
+          where: { key: modelKey },
+          update: { value: sanitizedModel },
+          create: { key: modelKey, value: sanitizedModel },
+        })
+        .catch((err) =>
+          this.logger.warn(`Failed to auto-heal model setting in DB: ${err}`),
+        );
+    }
+
     return {
       provider,
       apiKey,
-      model: modelKey
-        ? await this.getSetting(modelKey, '')
-        : await this.getSetting('llm_model', 'gemini-3.6-flash'),
+      model: sanitizedModel,
     };
+  }
+
+  private sanitizeModelName(provider: string, model: string): string {
+    const trimmed = (model || '').trim();
+    if (provider === 'gemini') {
+      const invalidGeminiModels = ['gemini-3.6-flash', 'gemini-1.0-pro', 'gemini-pro'];
+      if (!trimmed || invalidGeminiModels.includes(trimmed.toLowerCase())) {
+        return 'gemini-2.0-flash';
+      }
+    }
+    return trimmed || 'gemini-2.0-flash';
   }
 
   async generateIdeas(

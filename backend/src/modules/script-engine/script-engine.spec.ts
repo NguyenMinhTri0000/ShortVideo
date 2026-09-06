@@ -106,7 +106,7 @@ describe('ScriptEngine 2.0', () => {
       getActiveProviderConfig: jest.fn().mockResolvedValue({
         provider: 'gemini',
         apiKey: 'mock-key',
-        model: 'gemini-3.6-flash',
+        model: 'gemini-2.0-flash',
       }),
     };
 

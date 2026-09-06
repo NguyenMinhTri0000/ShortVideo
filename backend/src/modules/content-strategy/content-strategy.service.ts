@@ -134,15 +134,20 @@ export class ContentStrategyService {
       }
     }
 
-    // Execute generation pipeline
-    const ideas = await this.executeStrategyPipeline(productId);
+    try {
+      const ideas = await this.executeStrategyPipeline(productId);
 
-    return {
-      success: true,
-      jobId,
-      count: ideas.length,
-      ideas,
-    };
+      return {
+        success: true,
+        jobId,
+        count: ideas.length,
+        ideas,
+      };
+    } catch (err) {
+      this.logger.error(`[ContentStrategy] Top-level failure in generateContentIdeas: ${err}`);
+      if (err instanceof NotFoundException) throw err;
+      throw new BadRequestException('Không thể khởi tạo ý tưởng nội dung. Vui lòng kiểm tra lại dữ liệu sản phẩm.');
+    }
   }
 
   /**
@@ -152,76 +157,115 @@ export class ContentStrategyService {
   async executeStrategyPipeline(
     productId: string,
   ): Promise<ContentIdeaResponse[]> {
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
-    });
+    try {
+      const product = await this.prisma.product.findUnique({
+        where: { id: productId },
+      });
 
-    if (!product) {
-      throw new NotFoundException('Không tìm thấy sản phẩm');
-    }
+      if (!product) {
+        throw new NotFoundException('Không tìm thấy sản phẩm');
+      }
 
-    const { provider, apiKey, model } =
-      await this.llmService.getActiveProviderConfig();
+      const { provider, apiKey, model } =
+        await this.llmService.getActiveProviderConfig();
 
-    let rawIdeas: RawContentIdeaItem[] = [];
+      let rawIdeas: RawContentIdeaItem[] = [];
 
-    if (apiKey) {
-      const researchContext = this.buildResearchContext(product);
-      const prompt = CONTENT_STRATEGY_PROMPT.replace(
-        '{PRODUCT_RESEARCH_DATA}',
-        researchContext,
-      );
-
-      try {
-        const responseText = await this.callLlm(provider, apiKey, model, prompt);
-        rawIdeas = this.parseAndValidateResponse(responseText);
-      } catch (err) {
+      if (apiKey) {
+        try {
+          const researchContext = this.buildResearchContext(product);
+          const prompt = CONTENT_STRATEGY_PROMPT.replace(
+            '{PRODUCT_RESEARCH_DATA}',
+            researchContext,
+          );
+          const responseText = await this.callLlm(provider, apiKey, model, prompt);
+          rawIdeas = this.parseAndValidateResponse(responseText);
+        } catch (err) {
+          this.logger.warn(
+            `[ContentStrategy] LLM API call or context building failed (${err instanceof Error ? err.message : String(err)}). Falling back to rule-based research synthesis.`,
+          );
+        }
+      } else {
         this.logger.warn(
-          `[ContentStrategy] LLM API call failed (${err instanceof Error ? err.message : String(err)}). Falling back to rule-based research synthesis.`,
+          '[ContentStrategy] No LLM API key configured. Using rule-based research synthesis fallback.',
         );
       }
-    } else {
-      this.logger.warn(
-        '[ContentStrategy] No LLM API key configured. Using rule-based research synthesis fallback.',
+
+      if (rawIdeas.length === 0) {
+        rawIdeas = this.buildFallbackIdeas(product);
+      }
+
+      // Clear old draft ideas for this product if re-generating (catch DB error if linked scripts exist)
+      try {
+        await this.prisma.contentIdea.deleteMany({
+          where: { productId, status: 'draft' },
+        });
+      } catch (dbErr) {
+        this.logger.warn(
+          `[ContentStrategy] Unable to clear previous draft ideas for product ${productId}: ${dbErr}`,
+        );
+      }
+
+      // Save newly generated ideas into DB with safe individual creation
+      const savedIdeas = [];
+      for (let index = 0; index < rawIdeas.length; index++) {
+        const item = rawIdeas[index];
+        try {
+          const created = await this.prisma.contentIdea.create({
+            data: {
+              productId,
+              title: item.title || 'Ý tưởng nội dung',
+              description: item.description || item.title || 'Mô tả ý tưởng',
+              contentType: this.normalizeContentType(item.contentType),
+              marketingAngle: item.marketingAngle || 'Tổng quan',
+              targetAudience: item.targetAudience || 'Khách hàng mục tiêu',
+              painPoint: item.painPoint || 'Vấn đề thực tế',
+              keyMessage: item.keyMessage || item.title || 'Thông điệp cốt lõi',
+              hook: item.hook || item.title || 'Hook mở đầu',
+              recommendedCTA: item.recommendedCTA || 'Xem thêm chi tiết',
+              priority: item.priority && item.priority >= 1 && item.priority <= 5 ? item.priority : (index % 5) + 1,
+              status: 'draft',
+            },
+          });
+          savedIdeas.push(created);
+        } catch (createErr) {
+          this.logger.error(
+            `[ContentStrategy] Failed to persist idea index ${index} for product ${productId}: ${createErr}`,
+          );
+        }
+      }
+
+      this.logger.log(
+        `[ContentStrategy] Successfully created ${savedIdeas.length} content ideas for product ${productId}`,
       );
+
+      return savedIdeas.map((idea) => this.mapToResponse(idea));
+    } catch (topErr) {
+      this.logger.error(
+        `[ContentStrategy] Unhandled exception in executeStrategyPipeline for productId=${productId}: ${topErr}`,
+      );
+      if (topErr instanceof NotFoundException) throw topErr;
+      const product = await this.prisma.product.findUnique({ where: { id: productId } });
+      if (!product) throw new NotFoundException('Không tìm thấy sản phẩm');
+      const fallbackIdeas = this.buildFallbackIdeas(product);
+      return fallbackIdeas.map((item, index) => ({
+        id: `fallback-${Date.now()}-${index}`,
+        productId,
+        title: item.title,
+        description: item.description,
+        contentType: item.contentType,
+        marketingAngle: item.marketingAngle,
+        targetAudience: item.targetAudience,
+        painPoint: item.painPoint,
+        keyMessage: item.keyMessage,
+        hook: item.hook,
+        recommendedCTA: item.recommendedCTA,
+        priority: item.priority,
+        status: 'draft',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
     }
-
-    if (rawIdeas.length === 0) {
-      rawIdeas = this.buildFallbackIdeas(product);
-    }
-
-    // Clear old draft ideas for this product if re-generating
-    await this.prisma.contentIdea.deleteMany({
-      where: { productId, status: 'draft' },
-    });
-
-    // Save newly generated ideas into DB
-    const savedIdeas = await Promise.all(
-      rawIdeas.map((item, index) =>
-        this.prisma.contentIdea.create({
-          data: {
-            productId,
-            title: item.title,
-            description: item.description,
-            contentType: this.normalizeContentType(item.contentType),
-            marketingAngle: item.marketingAngle,
-            targetAudience: item.targetAudience,
-            painPoint: item.painPoint,
-            keyMessage: item.keyMessage,
-            hook: item.hook,
-            recommendedCTA: item.recommendedCTA,
-            priority: item.priority && item.priority >= 1 && item.priority <= 5 ? item.priority : (index % 5) + 1,
-            status: 'draft',
-          },
-        }),
-      ),
-    );
-
-    this.logger.log(
-      `[ContentStrategy] Successfully created ${savedIdeas.length} content ideas for product ${productId}`,
-    );
-
-    return savedIdeas.map((idea) => this.mapToResponse(idea));
   }
 
   async getContentIdeasByProduct(
@@ -397,22 +441,49 @@ Target Audience: ${product.targetAudience || 'N/A'}
   // Helper methods
   // ---------------------------------------------------------------------------
 
+  private safeArrayJoin(val: any, delimiter = '; '): string {
+    if (Array.isArray(val)) {
+      const items = val.filter(
+        (item) => item !== null && item !== undefined && String(item).trim().length > 0,
+      );
+      return items.length > 0 ? items.join(delimiter) : 'Không có';
+    }
+    if (typeof val === 'string' && val.trim().length > 0) {
+      return val.trim();
+    }
+    return 'Không có';
+  }
+
+  private firstArrayItem(val: any, fallback: string): string {
+    if (Array.isArray(val) && val.length > 0) {
+      const first = val[0];
+      if (first !== null && first !== undefined && String(first).trim().length > 0) {
+        return String(first).trim();
+      }
+    }
+    if (typeof val === 'string' && val.trim().length > 0) {
+      return val.trim();
+    }
+    return fallback;
+  }
+
   private buildResearchContext(product: any): string {
     const brief = product.contentBrief as any;
+    const painPointsText = this.safeArrayJoin(product.painPoints);
     return `
-Tên sản phẩm: ${product.name}
+Tên sản phẩm: ${product.name || 'Sản phẩm'}
 Thương hiệu: ${product.brand || 'N/A'}
 Danh mục: ${product.category || 'N/A'}
 Mô tả: ${product.description || 'N/A'}
-Giá bán: ${product.price ? `${product.price} ${product.currency}` : 'Chưa rõ'}
-Tính năng nổi bật: ${product.features?.join('; ') || 'Không có'}
-Lợi ích sử dụng: ${product.benefits?.join('; ') || 'Không có'}
-Điểm bán hàng độc nhất (USP): ${product.usp?.join('; ') || 'Không có'}
+Giá bán: ${product.price ? `${product.price} ${product.currency || 'VND'}` : 'Chưa rõ'}
+Tính năng nổi bật: ${this.safeArrayJoin(product.features)}
+Lợi ích sử dụng: ${this.safeArrayJoin(product.benefits)}
+Điểm bán hàng độc nhất (USP): ${this.safeArrayJoin(product.usp)}
 Đối tượng khách hàng mục tiêu: ${product.targetAudience || brief?.targetAudience || 'Khách hàng quan tâm'}
-Nỗi đau / Vấn đề cần giải quyết: ${product.painPoints?.join('; ') || brief?.mainPainPoint || 'Không có'}
-Trường hợp sử dụng (Use cases): ${product.useCases?.join('; ') || 'Không có'}
-Ưu điểm: ${product.pros?.join('; ') || 'Không có'}
-Nhược điểm: ${product.cons?.join('; ') || 'Không có'}
+Nỗi đau / Vấn đề cần giải quyết: ${painPointsText !== 'Không có' ? painPointsText : (brief?.mainPainPoint || 'Không có')}
+Trường hợp sử dụng (Use cases): ${this.safeArrayJoin(product.useCases)}
+Ưu điểm: ${this.safeArrayJoin(product.pros)}
+Nhược điểm: ${this.safeArrayJoin(product.cons)}
 `.trim();
   }
 
@@ -438,7 +509,7 @@ Nhược điểm: ${product.cons?.join('; ') || 'Không có'}
     let responseText = '';
 
     if (provider === 'gemini') {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-3.6-flash'}:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-2.0-flash'}:generateContent?key=${apiKey}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -560,12 +631,12 @@ Nhược điểm: ${product.cons?.join('; ') || 'Không có'}
 
   private buildFallbackIdeas(product: any): RawContentIdeaItem[] {
     const pName = product.name || 'Sản phẩm';
-    const pPrice = product.price ? `${product.price} ${product.currency}` : 'mức giá hiện tại';
+    const pPrice = product.price ? `${product.price} ${product.currency || 'VND'}` : 'mức giá hiện tại';
     const mainAudience = product.targetAudience || 'người tiêu dùng hiện đại';
-    const firstPain = product.painPoints?.[0] || 'chưa tìm được giải pháp tối ưu';
-    const firstBenefit = product.benefits?.[0] || 'mang lại trải nghiệm tuyệt vời';
-    const firstFeature = product.features?.[0] || 'thiết kế thông minh';
-    const firstUsp = product.usp?.[0] || 'chất lượng vượt trội';
+    const firstPain = this.firstArrayItem(product.painPoints, 'chưa tìm được giải pháp tối ưu');
+    const firstBenefit = this.firstArrayItem(product.benefits, 'mang lại trải nghiệm tuyệt vời');
+    const firstFeature = this.firstArrayItem(product.features, 'thiết kế thông minh');
+    const firstUsp = this.firstArrayItem(product.usp, 'chất lượng vượt trội');
 
     return [
       {

@@ -14,6 +14,10 @@
   - `TASK-000`: Setup Repository Structure & AI Memory (`.ai/`)
   - `TASK-001`: Verify Autonomous Development Workflow Setup (`.ai/tasks/TASK-001-setup-verification.md`)
   - `TASK-003`: Add Autonomous Development Workflow Quickstart Guide (`.ai/tasks/TASK-003-quickstart-guide.md`)
+  - `TASK-004`: Fix HTTP 500 error on AI content ideas generation (`.ai/tasks/TASK-004-fix-content-ideas-generation-500.md`)
+  - `TASK-005`: Sanitize invalid Gemini model names and add global exception handling (`.ai/tasks/TASK-005-sanitize-gemini-models-and-enhance-error-handling.md`)
+  - `TASK-006`: Harden content strategy pipeline against TypeErrors and unhandled 500 errors (`.ai/tasks/TASK-006-harden-content-strategy-pipeline.md`)
+  - `TASK-007`: Verify Gemini API Key Functionality (`.ai/tasks/TASK-007-verify-gemini-api-key.md`)
 - **Blocked Tasks**: None
 - **Next Recommended Task**: `TASK-002`: Clean up existing ESLint technical debt (`.ai/tasks/TASK-002-cleanup-eslint-tech-debt.md`)
 
