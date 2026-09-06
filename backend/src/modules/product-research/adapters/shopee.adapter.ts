@@ -37,7 +37,7 @@ export class ShopeeAdapter extends ProductSourceAdapter {
 
     const rawData = await this.genericAdapter.extract(url);
 
-    // Clean Shopee image URLs (remove SVG icons, @resize_... and thumbnail suffixes)
+    // Clean Shopee image URLs (remove SVG icons, @resize_... while keeping working CDN suffixes)
     const shopeeImages: string[] = [];
     for (const rawImg of rawData.images || []) {
       if (
@@ -47,11 +47,12 @@ export class ShopeeAdapter extends ProductSourceAdapter {
       ) {
         continue;
       }
-      const cleanImg = rawImg
-        .replace(/@resize_[^?#]+/i, '')
-        .replace(/_(tn|cover|100x100|60x60|80x80|200x200)$/i, '');
+      const cleanImg = rawImg.replace(/@resize_[^?#]+/i, '');
       if (cleanImg && !shopeeImages.includes(cleanImg)) {
         shopeeImages.push(cleanImg);
+      }
+      if (rawImg && !shopeeImages.includes(rawImg)) {
+        shopeeImages.push(rawImg);
       }
     }
 

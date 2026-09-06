@@ -312,16 +312,24 @@ export class VideoProcessor extends WorkerHost {
           } else if (line.includes('## downloading videos from')) {
             status = 'fetching_materials';
             progress = 65;
-          } else if (line.includes('## combining video')) {
+          } else if (
+            line.includes('## combining video') ||
+            line.includes('concatenating')
+          ) {
             status = 'rendering';
             progress = 75;
-          } else if (line.includes('## generating video')) {
+          } else if (
+            line.includes('## generating video') ||
+            line.includes('video combining completed')
+          ) {
             status = 'rendering';
-            progress = 88;
+            progress = 85;
           } else if (
             line.includes('Writing video') ||
             line.includes('MoviePy') ||
-            line.includes('video writer')
+            line.includes('video writer') ||
+            line.includes('ffmpeg') ||
+            line.includes('frame=')
           ) {
             status = 'rendering';
             progress = 92;
@@ -378,7 +386,7 @@ export class VideoProcessor extends WorkerHost {
         reject(err);
       });
 
-      pyProcess.on('close', (code) => {
+      pyProcess.on('close', (code, signal) => {
         if (settled) return;
         settled = true;
         void (async () => {
@@ -392,16 +400,34 @@ export class VideoProcessor extends WorkerHost {
             return;
           }
 
-          this.logger.log(`Engine CLI completed with code: ${code}`);
+          this.logger.log(
+            `Engine CLI completed with exit code: ${code}, signal: ${signal}`,
+          );
 
-          if (code !== 0) {
+          const finalVideoPath = path.join(taskStorageDir, 'final-1.mp4');
+          const videoExists = fs.existsSync(finalVideoPath);
+
+          // Consider CLI execution successful if exit code is 0 OR if the output video was created
+          const isSuccess = code === 0 || videoExists;
+
+          if (!isSuccess) {
             const lastErrorLog = await this.prisma.jobLog.findFirst({
-              where: { jobId, level: { in: ['error', 'warn'] } },
+              where: {
+                jobId,
+                level: { in: ['error', 'warn'] },
+                NOT: {
+                  message: {
+                    contains: 'SUCCESS',
+                  },
+                },
+              },
               orderBy: { createdAt: 'desc' },
             });
+            const exitDetail =
+              code !== null ? `exit code ${code}` : `signal ${signal}`;
             const errMsg = lastErrorLog
-              ? `${lastErrorLog.message} (Lỗi mã exit ${code})`
-              : `CLI execution failed with exit code ${code}`;
+              ? `${lastErrorLog.message} (Lỗi CLI: ${exitDetail})`
+              : `CLI execution failed with ${exitDetail}`;
             await this.prisma.generationJob.update({
               where: { id: jobId },
               data: {

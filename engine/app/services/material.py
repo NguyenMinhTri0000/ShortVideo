@@ -659,7 +659,19 @@ def process_product_images(
                 pass
 
     if not valid_local_images:
-        return []
+        # If all product image downloads returned 404 or failed, generate aesthetic fallback product slide
+        try:
+            from PIL import Image, ImageDraw
+            fallback_img_path = os.path.join(task_dir, "prod_img_fallback.jpg")
+            img = Image.new("RGB", (width, height), color=(24, 24, 27))
+            draw = ImageDraw.Draw(img)
+            draw.rectangle([0, 0, width, 12], fill=(59, 130, 246))
+            img.save(fallback_img_path)
+            valid_local_images.append(fallback_img_path)
+            logger.info("Generated aesthetic fallback product image slide for dead image URLs")
+        except Exception as e:
+            logger.warning(f"Could not generate fallback product slide: {e}")
+            return []
 
     # Determine required clip count to satisfy target_p0_duration
     if target_p0_duration > 0:
