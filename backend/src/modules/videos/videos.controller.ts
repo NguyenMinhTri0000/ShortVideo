@@ -26,10 +26,7 @@ export class VideosController {
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
-  async uploadVideo(
-    @UploadedFile() file: any,
-    @Body('title') title?: string,
-  ) {
+  async uploadVideo(@UploadedFile() file: any, @Body('title') title?: string) {
     return this.videosService.uploadVideo(file, title);
   }
 

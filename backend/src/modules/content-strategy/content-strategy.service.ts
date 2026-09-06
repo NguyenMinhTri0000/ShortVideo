@@ -105,7 +105,9 @@ export class ContentStrategyService {
   async generateContentIdeas(
     productId: string,
   ): Promise<ContentStrategyGenerateResult> {
-    this.logger.log(`[ContentStrategy] Starting idea generation for productId=${productId}`);
+    this.logger.log(
+      `[ContentStrategy] Starting idea generation for productId=${productId}`,
+    );
 
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
@@ -123,10 +125,17 @@ export class ContentStrategyService {
         const job = await this.strategyQueue.add(
           'generate-content-ideas',
           { productId },
-          { attempts: 2, backoff: 5000, removeOnComplete: 100, removeOnFail: 200 },
+          {
+            attempts: 2,
+            backoff: 5000,
+            removeOnComplete: 100,
+            removeOnFail: 200,
+          },
         );
         jobId = job.id;
-        this.logger.log(`[Worker] Enqueued content strategy job ${jobId} for product ${productId}`);
+        this.logger.log(
+          `[Worker] Enqueued content strategy job ${jobId} for product ${productId}`,
+        );
       } catch (queueErr) {
         this.logger.warn(
           `[Worker] Redis queue enqueue failed, executing content strategy inline: ${queueErr}`,
@@ -144,9 +153,13 @@ export class ContentStrategyService {
         ideas,
       };
     } catch (err) {
-      this.logger.error(`[ContentStrategy] Top-level failure in generateContentIdeas: ${err}`);
+      this.logger.error(
+        `[ContentStrategy] Top-level failure in generateContentIdeas: ${err}`,
+      );
       if (err instanceof NotFoundException) throw err;
-      throw new BadRequestException('Không thể khởi tạo ý tưởng nội dung. Vui lòng kiểm tra lại dữ liệu sản phẩm.');
+      throw new BadRequestException(
+        'Không thể khởi tạo ý tưởng nội dung. Vui lòng kiểm tra lại dữ liệu sản phẩm.',
+      );
     }
   }
 
@@ -178,7 +191,12 @@ export class ContentStrategyService {
             '{PRODUCT_RESEARCH_DATA}',
             researchContext,
           );
-          const responseText = await this.callLlm(provider, apiKey, model, prompt);
+          const responseText = await this.callLlm(
+            provider,
+            apiKey,
+            model,
+            prompt,
+          );
           rawIdeas = this.parseAndValidateResponse(responseText);
         } catch (err) {
           this.logger.warn(
@@ -223,7 +241,10 @@ export class ContentStrategyService {
               keyMessage: item.keyMessage || item.title || 'Thông điệp cốt lõi',
               hook: item.hook || item.title || 'Hook mở đầu',
               recommendedCTA: item.recommendedCTA || 'Xem thêm chi tiết',
-              priority: item.priority && item.priority >= 1 && item.priority <= 5 ? item.priority : (index % 5) + 1,
+              priority:
+                item.priority && item.priority >= 1 && item.priority <= 5
+                  ? item.priority
+                  : (index % 5) + 1,
               status: 'draft',
             },
           });
@@ -245,7 +266,9 @@ export class ContentStrategyService {
         `[ContentStrategy] Unhandled exception in executeStrategyPipeline for productId=${productId}: ${topErr}`,
       );
       if (topErr instanceof NotFoundException) throw topErr;
-      const product = await this.prisma.product.findUnique({ where: { id: productId } });
+      const product = await this.prisma.product.findUnique({
+        where: { id: productId },
+      });
       if (!product) throw new NotFoundException('Không tìm thấy sản phẩm');
       const fallbackIdeas = this.buildFallbackIdeas(product);
       return fallbackIdeas.map((item, index) => ({
@@ -260,7 +283,7 @@ export class ContentStrategyService {
         keyMessage: item.keyMessage,
         hook: item.hook,
         recommendedCTA: item.recommendedCTA,
-        priority: item.priority ?? (index + 1),
+        priority: item.priority ?? index + 1,
         status: 'draft',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -301,7 +324,10 @@ export class ContentStrategyService {
    * Selects a ContentIdea, converts it into a full script context with Product + Brief,
    * creates an Idea and GenerationJob record, and triggers BullMQ Video Processor.
    */
-  async generateVideoFromIdea(contentIdeaId: string, config: VideoJobConfig = {}) {
+  async generateVideoFromIdea(
+    contentIdeaId: string,
+    config: VideoJobConfig = {},
+  ) {
     const contentIdea = await this.prisma.contentIdea.findUnique({
       where: { id: contentIdeaId },
       include: { product: true },
@@ -412,7 +438,9 @@ Target Audience: ${product.targetAudience || 'N/A'}
     }
 
     if (targetIdeaIds.length === 0) {
-      throw new BadRequestException('Không tìm thấy ý tưởng nội dung nào để tạo video');
+      throw new BadRequestException(
+        'Không tìm thấy ý tưởng nội dung nào để tạo video',
+      );
     }
 
     this.logger.log(
@@ -425,7 +453,9 @@ Target Audience: ${product.targetAudience || 'N/A'}
         const result = await this.generateVideoFromIdea(id, config);
         results.push(result);
       } catch (err) {
-        this.logger.error(`[ContentStrategy] Batch generate failed for idea ${id}: ${err}`);
+        this.logger.error(
+          `[ContentStrategy] Batch generate failed for idea ${id}: ${err}`,
+        );
       }
     }
 
@@ -444,7 +474,8 @@ Target Audience: ${product.targetAudience || 'N/A'}
   private safeArrayJoin(val: any, delimiter = '; '): string {
     if (Array.isArray(val)) {
       const items = val.filter(
-        (item) => item !== null && item !== undefined && String(item).trim().length > 0,
+        (item) =>
+          item !== null && item !== undefined && String(item).trim().length > 0,
       );
       return items.length > 0 ? items.join(delimiter) : 'Không có';
     }
@@ -457,7 +488,11 @@ Target Audience: ${product.targetAudience || 'N/A'}
   private firstArrayItem(val: any, fallback: string): string {
     if (Array.isArray(val) && val.length > 0) {
       const first = val[0];
-      if (first !== null && first !== undefined && String(first).trim().length > 0) {
+      if (
+        first !== null &&
+        first !== undefined &&
+        String(first).trim().length > 0
+      ) {
         return String(first).trim();
       }
     }
@@ -468,7 +503,7 @@ Target Audience: ${product.targetAudience || 'N/A'}
   }
 
   private buildResearchContext(product: any): string {
-    const brief = product.contentBrief as any;
+    const brief = product.contentBrief;
     const painPointsText = this.safeArrayJoin(product.painPoints);
     return `
 Tên sản phẩm: ${product.name || 'Sản phẩm'}
@@ -480,7 +515,7 @@ Tính năng nổi bật: ${this.safeArrayJoin(product.features)}
 Lợi ích sử dụng: ${this.safeArrayJoin(product.benefits)}
 Điểm bán hàng độc nhất (USP): ${this.safeArrayJoin(product.usp)}
 Đối tượng khách hàng mục tiêu: ${product.targetAudience || brief?.targetAudience || 'Khách hàng quan tâm'}
-Nỗi đau / Vấn đề cần giải quyết: ${painPointsText !== 'Không có' ? painPointsText : (brief?.mainPainPoint || 'Không có')}
+Nỗi đau / Vấn đề cần giải quyết: ${painPointsText !== 'Không có' ? painPointsText : brief?.mainPainPoint || 'Không có'}
 Trường hợp sử dụng (Use cases): ${this.safeArrayJoin(product.useCases)}
 Ưu điểm: ${this.safeArrayJoin(product.pros)}
 Nhược điểm: ${this.safeArrayJoin(product.cons)}
@@ -557,12 +592,19 @@ Nhược điểm: ${this.safeArrayJoin(product.cons)}
     if (!rawText || !rawText.trim()) return [];
 
     let cleaned = rawText.trim();
-    cleaned = cleaned.replace(/```json/g, '').replace(/```/g, '').trim();
+    cleaned = cleaned
+      .replace(/```json/g, '')
+      .replace(/```/g, '')
+      .trim();
 
     // Locate first '[' and last ']' if extra narrative wrapped the response
     const firstBracket = cleaned.indexOf('[');
     const lastBracket = cleaned.lastIndexOf(']');
-    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+    if (
+      firstBracket !== -1 &&
+      lastBracket !== -1 &&
+      lastBracket > firstBracket
+    ) {
       cleaned = cleaned.substring(firstBracket, lastBracket + 1);
     }
 
@@ -631,11 +673,22 @@ Nhược điểm: ${this.safeArrayJoin(product.cons)}
 
   private buildFallbackIdeas(product: any): RawContentIdeaItem[] {
     const pName = product.name || 'Sản phẩm';
-    const pPrice = product.price ? `${product.price} ${product.currency || 'VND'}` : 'mức giá hiện tại';
+    const pPrice = product.price
+      ? `${product.price} ${product.currency || 'VND'}`
+      : 'mức giá hiện tại';
     const mainAudience = product.targetAudience || 'người tiêu dùng hiện đại';
-    const firstPain = this.firstArrayItem(product.painPoints, 'chưa tìm được giải pháp tối ưu');
-    const firstBenefit = this.firstArrayItem(product.benefits, 'mang lại trải nghiệm tuyệt vời');
-    const firstFeature = this.firstArrayItem(product.features, 'thiết kế thông minh');
+    const firstPain = this.firstArrayItem(
+      product.painPoints,
+      'chưa tìm được giải pháp tối ưu',
+    );
+    const firstBenefit = this.firstArrayItem(
+      product.benefits,
+      'mang lại trải nghiệm tuyệt vời',
+    );
+    const firstFeature = this.firstArrayItem(
+      product.features,
+      'thiết kế thông minh',
+    );
     const firstUsp = this.firstArrayItem(product.usp, 'chất lượng vượt trội');
 
     return [
@@ -648,7 +701,8 @@ Nhược điểm: ${this.safeArrayJoin(product.cons)}
         painPoint: 'Lo lắng mua đắt hoặc không đúng nhu cầu',
         keyMessage: `Giá trị sử dụng và sự tiện lợi của ${pName} hoàn toàn tương xứng với chi phí`,
         hook: `${pPrice} cho chiếc ${pName} này, liệu có thực sự đáng xuống tiền?`,
-        recommendedCTA: 'Nhấp ngay link góc dưới màn hình để xem ưu đãi giá hôm nay!',
+        recommendedCTA:
+          'Nhấp ngay link góc dưới màn hình để xem ưu đãi giá hôm nay!',
         priority: 1,
       },
       {
@@ -694,9 +748,11 @@ Nhược điểm: ${this.safeArrayJoin(product.cons)}
         marketingAngle: 'Hướng dẫn & Mẹo hữu ích',
         targetAudience: 'Người mới mua sản phẩm',
         painPoint: 'Chưa biết cách dùng đúng cách để đạt độ bền cao nhất',
-        keyMessage: 'Sử dụng đúng cách giúp tăng x2 độ bền và tối ưu trải nghiệm',
+        keyMessage:
+          'Sử dụng đúng cách giúp tăng x2 độ bền và tối ưu trải nghiệm',
         hook: 'Mới mua chiếc này về mà dùng sai cách là coi như bỏ! Xem ngay mẹo này!',
-        recommendedCTA: 'Lưu lại video này và xem thông tin sản phẩm bên dưới nhé!',
+        recommendedCTA:
+          'Lưu lại video này và xem thông tin sản phẩm bên dưới nhé!',
         priority: 2,
       },
       {
@@ -730,7 +786,8 @@ Nhược điểm: ${this.safeArrayJoin(product.cons)}
         marketingAngle: 'Khách quan & Minh bạch',
         targetAudience: mainAudience,
         painPoint: 'Ngại quảng cáo thổi phồng sự thật',
-        keyMessage: 'Nắm rõ cả ưu và nhược điểm giúp bạn đưa ra quyết định mua sắm thông minh',
+        keyMessage:
+          'Nắm rõ cả ưu và nhược điểm giúp bạn đưa ra quyết định mua sắm thông minh',
         hook: 'Nhược điểm duy nhất của chiếc này bạn cần biết trước khi chốt đơn!',
         recommendedCTA: 'Xem ngay thông tin giá tốt ở link mô tả!',
         priority: 3,
@@ -742,7 +799,8 @@ Nhược điểm: ${this.safeArrayJoin(product.cons)}
         marketingAngle: 'Giải đáp thắc mắc',
         targetAudience: mainAudience,
         painPoint: 'Còn vướng mắc lo lắng về bảo hành và sử dụng',
-        keyMessage: 'Tất cả thắc mắc của bạn đều có câu trả lời rõ ràng và cam kết bảo hành uy tín',
+        keyMessage:
+          'Tất cả thắc mắc của bạn đều có câu trả lời rõ ràng và cam kết bảo hành uy tín',
         hook: 'Bạn vẫn còn lăn tăn về chiếc nồi này? Đây là câu trả lời!',
         recommendedCTA: 'Click link để được hỗ trợ và tư vấn chi tiết hơn nhé!',
         priority: 3,

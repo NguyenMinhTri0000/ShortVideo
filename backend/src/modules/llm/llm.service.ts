@@ -126,7 +126,11 @@ export class LlmService {
   private sanitizeModelName(provider: string, model: string): string {
     const trimmed = (model || '').trim();
     if (provider === 'gemini') {
-      const invalidGeminiModels = ['gemini-3.6-flash', 'gemini-1.0-pro', 'gemini-pro'];
+      const invalidGeminiModels = [
+        'gemini-3.6-flash',
+        'gemini-1.0-pro',
+        'gemini-pro',
+      ];
       if (!trimmed || invalidGeminiModels.includes(trimmed.toLowerCase())) {
         return 'gemini-2.0-flash';
       }

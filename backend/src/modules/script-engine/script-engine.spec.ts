@@ -67,7 +67,8 @@ describe('ScriptEngine 2.0', () => {
         startTime: 4,
         endTime: 14,
         duration: 10,
-        narration: 'Dung tích 6.2 lít với công nghệ Rapid Air giúp giảm 90% dầu mỡ.',
+        narration:
+          'Dung tích 6.2 lít với công nghệ Rapid Air giúp giảm 90% dầu mỡ.',
         onScreenText: '6.2L - GIẢM 90% DẦU MỠ',
         visualDirection: 'Show close up control panel',
         mediaType: 'product_video',
@@ -153,7 +154,10 @@ describe('ScriptEngine 2.0', () => {
         },
       ];
 
-      const normalized = service.normalizeAndValidateTiming(rawScenes, mockContentIdea);
+      const normalized = service.normalizeAndValidateTiming(
+        rawScenes,
+        mockContentIdea,
+      );
 
       expect(normalized.length).toBe(2);
       expect(normalized[0].startTime).toBe(0);
@@ -164,7 +168,10 @@ describe('ScriptEngine 2.0', () => {
     });
 
     it('should generate fallback scenes if rawScenes are missing or empty', () => {
-      const normalized = service.normalizeAndValidateTiming([], mockContentIdea);
+      const normalized = service.normalizeAndValidateTiming(
+        [],
+        mockContentIdea,
+      );
 
       expect(normalized.length).toBeGreaterThan(0);
       expect(normalized[0].startTime).toBe(0);
@@ -231,9 +238,9 @@ describe('ScriptEngine 2.0', () => {
 
     it('should throw NotFoundException if ContentIdea does not exist', async () => {
       prismaService.contentIdea.findUnique.mockResolvedValue(null);
-      await expect(service.generateScriptFromIdea('invalid-id')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.generateScriptFromIdea('invalid-id'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should trigger legacy video generation from VideoScript', async () => {

@@ -56,7 +56,9 @@ export class EncryptionService {
     }
   }
 
-  sanitizeAccount<T extends { accessToken?: string | null; refreshToken?: string | null }>(
+  sanitizeAccount<
+    T extends { accessToken?: string | null; refreshToken?: string | null },
+  >(
     account: T,
   ): Omit<T, 'accessToken' | 'refreshToken'> & {
     hasAccessToken: boolean;

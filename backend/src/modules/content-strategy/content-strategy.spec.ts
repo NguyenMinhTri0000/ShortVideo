@@ -160,12 +160,17 @@ describe('ContentStrategyModule', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: LlmService, useValue: mockLlmService },
         { provide: QueueService, useValue: mockQueueService },
-        { provide: getQueueToken('content-strategy'), useValue: mockStrategyQueue },
+        {
+          provide: getQueueToken('content-strategy'),
+          useValue: mockStrategyQueue,
+        },
       ],
     }).compile();
 
     service = module.get<ContentStrategyService>(ContentStrategyService);
-    controller = module.get<ContentStrategyController>(ContentStrategyController);
+    controller = module.get<ContentStrategyController>(
+      ContentStrategyController,
+    );
     prisma = module.get<PrismaService>(PrismaService);
     llmService = module.get<LlmService>(LlmService);
   });
@@ -184,7 +189,9 @@ describe('ContentStrategyModule', () => {
 
     expect(result.success).toBe(true);
     expect(result.count).toBe(2);
-    expect(result.ideas[0].title).toBe('2.5 triệu mua nồi Philips có đáng không?');
+    expect(result.ideas[0].title).toBe(
+      '2.5 triệu mua nồi Philips có đáng không?',
+    );
     expect(result.ideas[0].contentType).toBe('value_for_money');
     expect(result.ideas[0].hook).toContain('2.5 triệu');
     expect(mockPrismaService.contentIdea.create).toHaveBeenCalledTimes(2);

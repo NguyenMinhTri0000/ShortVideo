@@ -12,9 +12,7 @@ export interface ProductResearchJobPayload {
 export class ProductResearchProcessor extends WorkerHost {
   private readonly logger = new Logger(ProductResearchProcessor.name);
 
-  constructor(
-    private readonly productResearchService: ProductResearchService,
-  ) {
+  constructor(private readonly productResearchService: ProductResearchService) {
     super();
   }
 

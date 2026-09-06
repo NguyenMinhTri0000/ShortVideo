@@ -627,3 +627,6 @@ Show all generated videos
 ```
 
 Làm xong MVP này là ông đã có một **video generation platform mini** dùng được thật rồi 🚀
+
+
+docker compose build frontend && docker compose up -d frontend

@@ -25,10 +25,22 @@ const BLOCKED_HOSTS = [
 
 const BLOCKED_IP_PREFIXES = [
   '10.',
-  '172.16.', '172.17.', '172.18.', '172.19.',
-  '172.20.', '172.21.', '172.22.', '172.23.',
-  '172.24.', '172.25.', '172.26.', '172.27.',
-  '172.28.', '172.29.', '172.30.', '172.31.',
+  '172.16.',
+  '172.17.',
+  '172.18.',
+  '172.19.',
+  '172.20.',
+  '172.21.',
+  '172.22.',
+  '172.23.',
+  '172.24.',
+  '172.25.',
+  '172.26.',
+  '172.27.',
+  '172.28.',
+  '172.29.',
+  '172.30.',
+  '172.31.',
   '192.168.',
   '0.',
 ];
@@ -58,14 +70,17 @@ export class UrlResolverService {
     this.logger.log(`[ProductResearch] Input URL: ${safeInputLog}`);
 
     const initialPlatformInfo = this.detectPlatform(cleanedInput);
-    const urlType: 'direct_product_url' | 'affiliate_short_link' | 'generic_url' =
+    const urlType:
+      'direct_product_url' | 'affiliate_short_link' | 'generic_url' =
       initialPlatformInfo.isShortLink
         ? 'affiliate_short_link'
         : initialPlatformInfo.platform !== 'generic'
           ? 'direct_product_url'
           : 'generic_url';
 
-    this.logger.log(`[ProductResearch] Detected platform: ${initialPlatformInfo.platform}`);
+    this.logger.log(
+      `[ProductResearch] Detected platform: ${initialPlatformInfo.platform}`,
+    );
     this.logger.log(`[ProductResearch] URL type: ${urlType}`);
 
     let resolvedFinalUrl = cleanedInput;
@@ -73,7 +88,10 @@ export class UrlResolverService {
     let redirectChain: string[] = [cleanedInput];
 
     // Always attempt redirect resolution if short link or if shopee url requires follow
-    if (initialPlatformInfo.isShortLink || initialPlatformInfo.platform === 'shopee') {
+    if (
+      initialPlatformInfo.isShortLink ||
+      initialPlatformInfo.platform === 'shopee'
+    ) {
       this.logger.log(`[ProductResearch] Resolving URL...`);
       const res = await this.resolveRedirects(
         cleanedInput,
@@ -101,9 +119,15 @@ export class UrlResolverService {
       if (extracted) {
         shopeeIds = { shopId: extracted.shopId, itemId: extracted.itemId };
         canonicalUrl = extracted.canonicalUrl;
-        this.logger.log(`[ProductResearch] Extracted shopId: ${shopeeIds.shopId}`);
-        this.logger.log(`[ProductResearch] Extracted itemId: ${shopeeIds.itemId}`);
-        this.logger.log(`[ProductResearch] Canonical URL: ${this.redactSensitiveParams(canonicalUrl)}`);
+        this.logger.log(
+          `[ProductResearch] Extracted shopId: ${shopeeIds.shopId}`,
+        );
+        this.logger.log(
+          `[ProductResearch] Extracted itemId: ${shopeeIds.itemId}`,
+        );
+        this.logger.log(
+          `[ProductResearch] Canonical URL: ${this.redactSensitiveParams(canonicalUrl)}`,
+        );
       } else if (initialPlatformInfo.isShortLink) {
         throw new BadRequestException(
           'The Shopee link was resolved successfully, but it does not point to a supported product page.',
@@ -147,7 +171,8 @@ export class UrlResolverService {
         const headers: Record<string, string> = {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          Accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
         };
 
@@ -165,8 +190,12 @@ export class UrlResolverService {
         // Collect cookies set by redirect responses
         const setCookieHeader = response.headers.get('set-cookie');
         if (setCookieHeader) {
-          const newCookies = setCookieHeader.split(',').map((c) => c.split(';')[0].trim());
-          cookiesToPass = Array.from(new Set([...cookiesToPass, ...newCookies]));
+          const newCookies = setCookieHeader
+            .split(',')
+            .map((c) => c.split(';')[0].trim());
+          cookiesToPass = Array.from(
+            new Set([...cookiesToPass, ...newCookies]),
+          );
         }
 
         const status = response.status;
@@ -180,7 +209,9 @@ export class UrlResolverService {
           try {
             nextUrl = new URL(location, currentUrl).href;
           } catch {
-            throw new BadRequestException(`Invalid redirect location header: ${location}`);
+            throw new BadRequestException(
+              `Invalid redirect location header: ${location}`,
+            );
           }
 
           if (visited.has(nextUrl)) {
@@ -208,7 +239,9 @@ export class UrlResolverService {
           );
         }
         const msg = err instanceof Error ? err.message : String(err);
-        throw new BadRequestException(`Unable to resolve Shopee affiliate URL. ${msg}`);
+        throw new BadRequestException(
+          `Unable to resolve Shopee affiliate URL. ${msg}`,
+        );
       } finally {
         clearTimeout(timeout);
       }
@@ -316,7 +349,9 @@ export class UrlResolverService {
 
       // Pattern 3: /{shopSlug}/{shopId}/{itemId} (e.g., /opaanlp/1016604648/23552060269)
       if (!shopId || !itemId) {
-        const slugMatch = pathname.match(/\/([a-zA-Z0-9_\-\.]+)\/(\d+)\/(\d+)/i);
+        const slugMatch = pathname.match(
+          /\/([a-zA-Z0-9_\-\.]+)\/(\d+)\/(\d+)/i,
+        );
         if (slugMatch) {
           shopId = slugMatch[2];
           itemId = slugMatch[3];
@@ -325,8 +360,12 @@ export class UrlResolverService {
 
       // Pattern 4: Query parameters shopid / itemid or shop_id / item_id
       if (!shopId || !itemId) {
-        const qShop = parsed.searchParams.get('shopid') || parsed.searchParams.get('shop_id');
-        const qItem = parsed.searchParams.get('itemid') || parsed.searchParams.get('item_id');
+        const qShop =
+          parsed.searchParams.get('shopid') ||
+          parsed.searchParams.get('shop_id');
+        const qItem =
+          parsed.searchParams.get('itemid') ||
+          parsed.searchParams.get('item_id');
         if (qShop && qItem && /^\d+$/.test(qShop) && /^\d+$/.test(qItem)) {
           shopId = qShop;
           itemId = qItem;

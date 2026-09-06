@@ -51,7 +51,10 @@ export class AnalyticsService {
         return undefined;
     }
 
-    const end = dto.dateRange === 'custom' && dto.endDate ? new Date(dto.endDate) : new Date();
+    const end =
+      dto.dateRange === 'custom' && dto.endDate
+        ? new Date(dto.endDate)
+        : new Date();
     return { gte: start, lte: end };
   }
 
@@ -64,13 +67,20 @@ export class AnalyticsService {
     });
 
     if (!job || job.status !== 'PUBLISHED' || !job.platformPostId) {
-      this.logger.warn(`Skipping analytics collection for job ${publishJobId}: Job not published or missing post ID.`);
+      this.logger.warn(
+        `Skipping analytics collection for job ${publishJobId}: Job not published or missing post ID.`,
+      );
       return;
     }
 
     try {
-      const adapter = this.publishingService.getAdapter(job.platform as PlatformType);
-      const metrics = await adapter.fetchAnalytics(job.platformAccount, job.platformPostId);
+      const adapter = this.publishingService.getAdapter(
+        job.platform as PlatformType,
+      );
+      const metrics = await adapter.fetchAnalytics(
+        job.platformAccount,
+        job.platformPostId,
+      );
 
       await this.prisma.postAnalytics.create({
         data: {
@@ -91,9 +101,14 @@ export class AnalyticsService {
         },
       });
 
-      this.logger.log(`Created analytics snapshot for job ${publishJobId} (Views: ${metrics.views}, Likes: ${metrics.likes})`);
+      this.logger.log(
+        `Created analytics snapshot for job ${publishJobId} (Views: ${metrics.views}, Likes: ${metrics.likes})`,
+      );
     } catch (error: any) {
-      this.logger.error(`Error collecting analytics snapshot for job ${publishJobId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error collecting analytics snapshot for job ${publishJobId}: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -141,14 +156,24 @@ export class AnalyticsService {
     let totalComments = 0;
     let totalShares = 0;
 
-    const platformStats: Record<string, { videos: number; views: number; likes: number; comments: number; shares: number }> = {
+    const platformStats: Record<
+      string,
+      {
+        videos: number;
+        views: number;
+        likes: number;
+        comments: number;
+        shares: number;
+      }
+    > = {
       TIKTOK: { videos: 0, views: 0, likes: 0, comments: 0, shares: 0 },
       YOUTUBE: { videos: 0, views: 0, likes: 0, comments: 0, shares: 0 },
       INSTAGRAM: { videos: 0, views: 0, likes: 0, comments: 0, shares: 0 },
       FACEBOOK: { videos: 0, views: 0, likes: 0, comments: 0, shares: 0 },
     };
 
-    let bestVideo: { videoId: string; title: string; views: number } | null = null;
+    let bestVideo: { videoId: string; title: string; views: number } | null =
+      null;
     let maxVideoViews = -1;
 
     const videoViewsMap: Record<string, { title: string; views: number }> = {};
@@ -166,7 +191,13 @@ export class AnalyticsService {
       totalShares += shares;
 
       if (!platformStats[job.platform]) {
-        platformStats[job.platform] = { videos: 0, views: 0, likes: 0, comments: 0, shares: 0 };
+        platformStats[job.platform] = {
+          videos: 0,
+          views: 0,
+          likes: 0,
+          comments: 0,
+          shares: 0,
+        };
       }
       platformStats[job.platform].videos += 1;
       platformStats[job.platform].views += views;
@@ -175,7 +206,10 @@ export class AnalyticsService {
       platformStats[job.platform].shares += shares;
 
       if (!videoViewsMap[job.videoId]) {
-        videoViewsMap[job.videoId] = { title: job.title || job.video.title, views: 0 };
+        videoViewsMap[job.videoId] = {
+          title: job.title || job.video.title,
+          views: 0,
+        };
       }
       videoViewsMap[job.videoId].views += views;
 
@@ -199,8 +233,14 @@ export class AnalyticsService {
     }
 
     const totalVideosPublished = publishedJobs.length;
-    const avgViewsPerVideo = totalVideosPublished > 0 ? Math.round(totalViews / totalVideosPublished) : 0;
-    const engagementRate = totalViews > 0 ? (totalLikes + totalComments + totalShares) / totalViews : 0;
+    const avgViewsPerVideo =
+      totalVideosPublished > 0
+        ? Math.round(totalViews / totalVideosPublished)
+        : 0;
+    const engagementRate =
+      totalViews > 0
+        ? (totalLikes + totalComments + totalShares) / totalViews
+        : 0;
 
     return {
       totalVideosPublished,
@@ -212,17 +252,25 @@ export class AnalyticsService {
       avgViewsPerVideo,
       engagementRate,
       bestPerformingVideo: bestVideo,
-      bestPerformingPlatform: bestPlatform ? { platform: bestPlatform, views: maxPlatformViews } : null,
-      platformComparison: Object.entries(platformStats).map(([platform, stats]) => ({
-        platform,
-        videos: stats.videos,
-        views: stats.views,
-        likes: stats.likes,
-        comments: stats.comments,
-        shares: stats.shares,
-        avgViews: stats.videos > 0 ? Math.round(stats.views / stats.videos) : 0,
-        engagementRate: stats.views > 0 ? (stats.likes + stats.comments + stats.shares) / stats.views : 0,
-      })),
+      bestPerformingPlatform: bestPlatform
+        ? { platform: bestPlatform, views: maxPlatformViews }
+        : null,
+      platformComparison: Object.entries(platformStats).map(
+        ([platform, stats]) => ({
+          platform,
+          videos: stats.videos,
+          views: stats.views,
+          likes: stats.likes,
+          comments: stats.comments,
+          shares: stats.shares,
+          avgViews:
+            stats.videos > 0 ? Math.round(stats.views / stats.videos) : 0,
+          engagementRate:
+            stats.views > 0
+              ? (stats.likes + stats.comments + stats.shares) / stats.views
+              : 0,
+        }),
+      ),
     };
   }
 
@@ -253,7 +301,8 @@ export class AnalyticsService {
       const likes = snap ? snap.likes : 0;
       const comments = snap ? snap.comments : 0;
       const shares = snap ? snap.shares : 0;
-      const engagementRate = views > 0 ? (likes + comments + shares) / views : 0;
+      const engagementRate =
+        views > 0 ? (likes + comments + shares) / views : 0;
 
       return {
         jobId: job.id,
@@ -273,7 +322,7 @@ export class AnalyticsService {
     });
 
     const sortBy = dto?.sortBy || 'views';
-    items.sort((a, b) => (b[sortBy] as number) - (a[sortBy] as number));
+    items.sort((a, b) => b[sortBy] - a[sortBy]);
 
     return items.slice(0, limit);
   }
@@ -290,7 +339,9 @@ export class AnalyticsService {
     });
 
     if (jobs.length === 0) {
-      throw new NotFoundException(`No publishing records found for video ID ${videoId}`);
+      throw new NotFoundException(
+        `No publishing records found for video ID ${videoId}`,
+      );
     }
 
     return jobs.map((job) => ({
@@ -327,7 +378,9 @@ export class AnalyticsService {
     });
 
     if (!job) {
-      throw new NotFoundException(`Publish job with ID ${publishJobId} not found.`);
+      throw new NotFoundException(
+        `Publish job with ID ${publishJobId} not found.`,
+      );
     }
 
     return {
@@ -376,7 +429,10 @@ export class AnalyticsService {
       },
     });
 
-    const angleStats: Record<string, { views: number; count: number; likes: number }> = {};
+    const angleStats: Record<
+      string,
+      { views: number; count: number; likes: number }
+    > = {};
     let totalViews = 0;
     let totalPosts = 0;
 
@@ -390,10 +446,15 @@ export class AnalyticsService {
       // Match angle/contentType from associated idea or product
       const idea = job.video?.idea;
       const matchedIdea = idea?.product?.contentIdeas.find(
-        (ci) => ci.title === idea.title || idea.description?.includes(ci.marketingAngle),
+        (ci) =>
+          ci.title === idea.title ||
+          idea.description?.includes(ci.marketingAngle),
       );
 
-      const angleKey = matchedIdea?.contentType || matchedIdea?.marketingAngle || 'product_review';
+      const angleKey =
+        matchedIdea?.contentType ||
+        matchedIdea?.marketingAngle ||
+        'product_review';
 
       if (!angleStats[angleKey]) {
         angleStats[angleKey] = { views: 0, count: 0, likes: 0 };
@@ -406,8 +467,12 @@ export class AnalyticsService {
     const overallAvgViews = totalPosts > 0 ? totalViews / totalPosts : 0;
 
     const angleInsights = Object.entries(angleStats).map(([angle, stats]) => {
-      const avgViews = stats.count > 0 ? Math.round(stats.views / stats.count) : 0;
-      const performanceMultiplier = overallAvgViews > 0 ? Number((avgViews / overallAvgViews).toFixed(2)) : 1;
+      const avgViews =
+        stats.count > 0 ? Math.round(stats.views / stats.count) : 0;
+      const performanceMultiplier =
+        overallAvgViews > 0
+          ? Number((avgViews / overallAvgViews).toFixed(2))
+          : 1;
 
       return {
         contentType: angle,
@@ -437,7 +502,9 @@ export class AnalyticsService {
             `Tập trung tạo thêm 3-5 video mới sử dụng định dạng nội dung "${topAngle.contentType}".`,
             `Thử nghiệm kết hợp Hook mở đầu của video hot nhất với sản phẩm cùng danh mục.`,
           ]
-        : ['Tiếp tục đăng thêm video để hệ thống tích lũy đủ dữ liệu phân tích.'],
+        : [
+            'Tiếp tục đăng thêm video để hệ thống tích lũy đủ dữ liệu phân tích.',
+          ],
     };
   }
 }

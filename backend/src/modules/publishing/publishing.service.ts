@@ -14,13 +14,21 @@ import { TikTokAdapter } from './adapters/tiktok.adapter';
 import { YouTubeAdapter } from './adapters/youtube.adapter';
 import { InstagramAdapter } from './adapters/instagram.adapter';
 import { FacebookAdapter } from './adapters/facebook.adapter';
-import { IsString, IsOptional, IsBoolean, IsArray, IsEnum } from 'class-validator';
-import { PlatformAdapter, PlatformType } from './adapters/platform-adapter.interface';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsArray,
+  IsEnum,
+} from 'class-validator';
+import {
+  PlatformAdapter,
+  PlatformType,
+} from './adapters/platform-adapter.interface';
 
 export class CreateAccountDto {
   @IsString()
   platform!: string;
-
 
   @IsString()
   accountName!: string;
@@ -125,7 +133,6 @@ export class CreateBatchPublishJobsDto {
   allowDuplicate?: boolean;
 }
 
-
 @Injectable()
 export class PublishingService {
   private readonly logger = new Logger(PublishingService.name);
@@ -159,7 +166,8 @@ export class PublishingService {
   // --- ACCOUNTS MANAGEMENT ---
 
   async getConfigStatus() {
-    const status: Record<string, { isConfigured: boolean; missing: string[] }> = {};
+    const status: Record<string, { isConfigured: boolean; missing: string[] }> =
+      {};
     for (const [platform, adapter] of this.adapters.entries()) {
       status[platform] = {
         isConfigured: adapter.isConfigured(),
@@ -173,9 +181,12 @@ export class PublishingService {
     const encryptedAccess = this.encryptionService.encrypt(dto.accessToken);
     const encryptedRefresh = this.encryptionService.encrypt(dto.refreshToken);
 
-    const isAdapterConfigured = this.getAdapter(dto.platform.toUpperCase() as PlatformType).isConfigured();
+    const isAdapterConfigured = this.getAdapter(
+      dto.platform.toUpperCase() as PlatformType,
+    ).isConfigured();
     const hasToken = Boolean(dto.accessToken && dto.accessToken.trim());
-    const status = hasToken || isAdapterConfigured ? 'ACTIVE' : 'NOT_CONFIGURED';
+    const status =
+      hasToken || isAdapterConfigured ? 'ACTIVE' : 'NOT_CONFIGURED';
 
     const account = await this.prisma.platformAccount.create({
       data: {
@@ -184,7 +195,9 @@ export class PublishingService {
         accountId: dto.accountId,
         accessToken: encryptedAccess,
         refreshToken: encryptedRefresh,
-        tokenExpiresAt: dto.tokenExpiresAt ? new Date(dto.tokenExpiresAt) : null,
+        tokenExpiresAt: dto.tokenExpiresAt
+          ? new Date(dto.tokenExpiresAt)
+          : null,
         status,
         metadata: dto.metadata || {},
       },
@@ -228,13 +241,17 @@ export class PublishingService {
   async getOAuthUrl(platform: PlatformType, redirectUri: string) {
     const adapter = this.getAdapter(platform);
     if (!adapter.isConfigured()) {
-      const missingKeys = adapter.getMissingConfig ? adapter.getMissingConfig() : [];
+      const missingKeys = adapter.getMissingConfig
+        ? adapter.getMissingConfig()
+        : [];
       if (missingKeys.length > 0) {
         throw new BadRequestException(
           `${platform} integration is not configured. Missing configuration: ${missingKeys.join(', ')}`,
         );
       }
-      throw new BadRequestException(`API credentials for ${platform} are not configured in backend.`);
+      throw new BadRequestException(
+        `API credentials for ${platform} are not configured in backend.`,
+      );
     }
     if (!adapter.getAuthUrl) {
       throw new BadRequestException(`OAuth not supported for ${platform}`);
@@ -242,14 +259,25 @@ export class PublishingService {
     return adapter.getAuthUrl(redirectUri);
   }
 
-  async handleOAuthCallback(platform: PlatformType, code: string, redirectUri: string) {
+  async handleOAuthCallback(
+    platform: PlatformType,
+    code: string,
+    redirectUri: string,
+  ) {
     const adapter = this.getAdapter(platform);
     if (!adapter.handleCallback) {
-      throw new BadRequestException(`OAuth callback not supported for ${platform}`);
+      throw new BadRequestException(
+        `OAuth callback not supported for ${platform}`,
+      );
     }
 
     const tokenResult = await adapter.handleCallback(code, redirectUri);
-    const dummyIds = ['facebook_page', 'instagram_account', 'tiktok_user', 'youtube_channel'];
+    const dummyIds = [
+      'facebook_page',
+      'instagram_account',
+      'tiktok_user',
+      'youtube_channel',
+    ];
     if (!tokenResult.accountId || dummyIds.includes(tokenResult.accountId)) {
       throw new BadRequestException(
         `OAuth callback completed, but could not resolve a valid target ${platform} account identity.`,
@@ -283,7 +311,9 @@ export class PublishingService {
       where: { id: dto.platformAccountId },
     });
     if (!account) {
-      throw new NotFoundException(`Platform Account with ID ${dto.platformAccountId} not found.`);
+      throw new NotFoundException(
+        `Platform Account with ID ${dto.platformAccountId} not found.`,
+      );
     }
 
     // 3. Duplicate Protection Check
@@ -327,7 +357,8 @@ export class PublishingService {
     });
 
     // 5. Enqueue in BullMQ
-    const delayMs = isScheduled && scheduledDate ? scheduledDate.getTime() - Date.now() : 0;
+    const delayMs =
+      isScheduled && scheduledDate ? scheduledDate.getTime() - Date.now() : 0;
     await this.publishingQueue.add(
       'publish-video',
       { jobId: job.id },
@@ -337,13 +368,17 @@ export class PublishingService {
       },
     );
 
-    this.logger.log(`Created publish job ${job.id} for platform ${account.platform} (Status: ${initialStatus}, Delay: ${delayMs}ms)`);
+    this.logger.log(
+      `Created publish job ${job.id} for platform ${account.platform} (Status: ${initialStatus}, Delay: ${delayMs}ms)`,
+    );
     return job;
   }
 
   async createBatchJobs(dto: CreateBatchPublishJobsDto) {
     if (!dto.platformAccountIds || dto.platformAccountIds.length === 0) {
-      throw new BadRequestException('Vui lòng chọn ít nhất một tài khoản mạng xã hội để đăng video');
+      throw new BadRequestException(
+        'Vui lòng chọn ít nhất một tài khoản mạng xã hội để đăng video',
+      );
     }
 
     const createdJobs = [];
@@ -396,11 +431,17 @@ export class PublishingService {
 
     return {
       ...job,
-      platformAccount: this.encryptionService.sanitizeAccount(job.platformAccount),
+      platformAccount: this.encryptionService.sanitizeAccount(
+        job.platformAccount,
+      ),
     };
   }
 
-  async listJobs(filters?: { platform?: string; status?: string; videoId?: string }) {
+  async listJobs(filters?: {
+    platform?: string;
+    status?: string;
+    videoId?: string;
+  }) {
     const where: any = {};
     if (filters?.platform) where.platform = filters.platform;
     if (filters?.status) where.status = filters.status;
@@ -410,7 +451,9 @@ export class PublishingService {
       where,
       include: {
         video: { select: { id: true, title: true, videoObjectKey: true } },
-        platformAccount: { select: { id: true, platform: true, accountName: true, status: true } },
+        platformAccount: {
+          select: { id: true, platform: true, accountName: true, status: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -494,22 +537,32 @@ export class PublishingService {
     return String(val);
   }
 
-  private async ensureFreshToken(account: any, adapter: PlatformAdapter): Promise<any> {
+  private async ensureFreshToken(
+    account: any,
+    adapter: PlatformAdapter,
+  ): Promise<any> {
     if (!adapter.refreshAuthToken || !account.refreshToken) {
       return account;
     }
 
-    const expiresAtMs = account.tokenExpiresAt ? new Date(account.tokenExpiresAt).getTime() : 0;
-    const isExpiredOrExpiringSoon = !expiresAtMs || expiresAtMs - Date.now() < 5 * 60 * 1000;
+    const expiresAtMs = account.tokenExpiresAt
+      ? new Date(account.tokenExpiresAt).getTime()
+      : 0;
+    const isExpiredOrExpiringSoon =
+      !expiresAtMs || expiresAtMs - Date.now() < 5 * 60 * 1000;
 
     if (!isExpiredOrExpiringSoon) {
       return account;
     }
 
     try {
-      this.logger.log(`Refreshing access token for ${account.platform} account "${account.accountName}" (${account.id})...`);
+      this.logger.log(
+        `Refreshing access token for ${account.platform} account "${account.accountName}" (${account.id})...`,
+      );
       const refreshed = await adapter.refreshAuthToken(account);
-      const encryptedAccess = this.encryptionService.encrypt(refreshed.accessToken);
+      const encryptedAccess = this.encryptionService.encrypt(
+        refreshed.accessToken,
+      );
       const encryptedRefresh = refreshed.refreshToken
         ? this.encryptionService.encrypt(refreshed.refreshToken)
         : account.refreshToken;
@@ -524,10 +577,14 @@ export class PublishingService {
         },
       });
 
-      this.logger.log(`Successfully refreshed access token for ${account.platform} account "${account.accountName}".`);
+      this.logger.log(
+        `Successfully refreshed access token for ${account.platform} account "${account.accountName}".`,
+      );
       return updatedAccount;
     } catch (err: any) {
-      this.logger.error(`Failed to auto-refresh token for account ${account.id}: ${err.message || err}`);
+      this.logger.error(
+        `Failed to auto-refresh token for account ${account.id}: ${err.message || err}`,
+      );
       return account;
     }
   }
@@ -546,7 +603,9 @@ export class PublishingService {
     }
 
     if (job.status === 'CANCELLED' || job.status === 'PUBLISHED') {
-      this.logger.warn(`Skipping execution for job ${jobId} with status ${job.status}`);
+      this.logger.warn(
+        `Skipping execution for job ${jobId} with status ${job.status}`,
+      );
       return;
     }
 
@@ -563,21 +622,31 @@ export class PublishingService {
       const adapter = this.getAdapter(job.platform as PlatformType);
 
       // Auto-refresh access token if expired or expiring soon
-      let activeAccount = await this.ensureFreshToken(job.platformAccount, adapter);
+      let activeAccount = await this.ensureFreshToken(
+        job.platformAccount,
+        adapter,
+      );
 
       // Get download URL / stream from MinIO / StorageService
-      const downloadUrl = await this.storageService.getDownloadUrl(job.video.videoObjectKey, 86400);
+      const downloadUrl = await this.storageService.getDownloadUrl(
+        job.video.videoObjectKey,
+        86400,
+      );
 
       let videoBuffer: Buffer | undefined;
       try {
-        const streamResult = await this.storageService.getFileStream(job.video.videoObjectKey);
+        const streamResult = await this.storageService.getFileStream(
+          job.video.videoObjectKey,
+        );
         const chunks: Uint8Array[] = [];
         for await (const chunk of streamResult.stream) {
           chunks.push(chunk);
         }
         videoBuffer = Buffer.concat(chunks);
       } catch (err: any) {
-        this.logger.warn(`Could not load video buffer directly from MinIO: ${err.message || err}`);
+        this.logger.warn(
+          `Could not load video buffer directly from MinIO: ${err.message || err}`,
+        );
       }
 
       const publishParams = {
@@ -597,17 +666,27 @@ export class PublishingService {
       let publishResult = await adapter.publish(activeAccount, publishParams);
 
       // If failed with 401 Auth error, force a refresh once and retry publish
-      const isAuthError = !publishResult.success && (
-        String(publishResult.errorCode) === '401' ||
-        String(publishResult.errorCode) === 'UNAUTHORIZED' ||
-        String(publishResult.errorMessage).includes('invalid authentication credentials')
-      );
+      const isAuthError =
+        !publishResult.success &&
+        (String(publishResult.errorCode) === '401' ||
+          String(publishResult.errorCode) === 'UNAUTHORIZED' ||
+          String(publishResult.errorMessage).includes(
+            'invalid authentication credentials',
+          ));
 
-      if (isAuthError && adapter.refreshAuthToken && activeAccount.refreshToken) {
-        this.logger.warn(`Job ${jobId} failed with auth error 401. Attempting forced token refresh and retry...`);
+      if (
+        isAuthError &&
+        adapter.refreshAuthToken &&
+        activeAccount.refreshToken
+      ) {
+        this.logger.warn(
+          `Job ${jobId} failed with auth error 401. Attempting forced token refresh and retry...`,
+        );
         try {
           const refreshed = await adapter.refreshAuthToken(activeAccount);
-          const encryptedAccess = this.encryptionService.encrypt(refreshed.accessToken);
+          const encryptedAccess = this.encryptionService.encrypt(
+            refreshed.accessToken,
+          );
           const encryptedRefresh = refreshed.refreshToken
             ? this.encryptionService.encrypt(refreshed.refreshToken)
             : activeAccount.refreshToken;
@@ -623,7 +702,9 @@ export class PublishingService {
           });
           publishResult = await adapter.publish(activeAccount, publishParams);
         } catch (refreshErr: any) {
-          this.logger.error(`Forced token refresh failed: ${refreshErr.message || refreshErr}`);
+          this.logger.error(
+            `Forced token refresh failed: ${refreshErr.message || refreshErr}`,
+          );
         }
       }
 
@@ -640,7 +721,9 @@ export class PublishingService {
           },
         });
 
-        this.logger.log(`Successfully published job ${jobId} to ${job.platform} (PostID: ${publishResult.platformPostId})`);
+        this.logger.log(
+          `Successfully published job ${jobId} to ${job.platform} (PostID: ${publishResult.platformPostId})`,
+        );
 
         // Schedule initial analytics collection snapshot (after 1 hour)
         await this.analyticsQueue.add(
@@ -653,18 +736,35 @@ export class PublishingService {
           where: { id: jobId },
           data: {
             status: 'FAILED',
-            errorMessage: this.safeString(publishResult.errorMessage, 'Publishing failed without specific error message.'),
-            errorCode: this.safeString(publishResult.errorCode, 'UNKNOWN_ERROR'),
+            errorMessage: this.safeString(
+              publishResult.errorMessage,
+              'Publishing failed without specific error message.',
+            ),
+            errorCode: this.safeString(
+              publishResult.errorCode,
+              'UNKNOWN_ERROR',
+            ),
           },
         });
 
-        this.logger.error(`Publish job ${jobId} failed: ${publishResult.errorMessage} (Code: ${publishResult.errorCode})`);
+        this.logger.error(
+          `Publish job ${jobId} failed: ${publishResult.errorMessage} (Code: ${publishResult.errorCode})`,
+        );
       }
     } catch (error: any) {
-      const errorMsg = this.safeString(error?.message || error, 'Internal error during job execution.');
-      const errorCode = this.safeString(error?.code || error?.errorCode, 'INTERNAL_JOB_ERROR');
+      const errorMsg = this.safeString(
+        error?.message || error,
+        'Internal error during job execution.',
+      );
+      const errorCode = this.safeString(
+        error?.code || error?.errorCode,
+        'INTERNAL_JOB_ERROR',
+      );
 
-      this.logger.error(`Execution crash on publish job ${jobId}: ${errorMsg}`, error?.stack);
+      this.logger.error(
+        `Execution crash on publish job ${jobId}: ${errorMsg}`,
+        error?.stack,
+      );
 
       try {
         await this.prisma.publishJob.update({
@@ -676,7 +776,9 @@ export class PublishingService {
           },
         });
       } catch (updateErr: any) {
-        this.logger.error(`Failed to record job ${jobId} failure state: ${updateErr?.message || updateErr}`);
+        this.logger.error(
+          `Failed to record job ${jobId} failure state: ${updateErr?.message || updateErr}`,
+        );
       }
     }
   }

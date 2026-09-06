@@ -53,10 +53,7 @@ export class ProductsController {
   }
 
   @Post(':id/generate-video')
-  generateVideo(
-    @Param('id') id: string,
-    @Body() config: VideoJobConfig,
-  ) {
+  generateVideo(@Param('id') id: string, @Body() config: VideoJobConfig) {
     return this.productsService.generateVideo(id, config);
   }
 }

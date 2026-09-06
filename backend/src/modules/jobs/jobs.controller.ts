@@ -1,4 +1,11 @@
-import { Controller, Get, Post, Param, Sse, MessageEvent } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Sse,
+  MessageEvent,
+} from '@nestjs/common';
 import { JobsService } from './jobs.service';
 import { Observable, interval } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
@@ -29,7 +36,7 @@ export class JobsController {
             progress: job?.progress,
             errorMessage: job?.errorMessage,
           },
-        } as MessageEvent;
+        };
       }),
     );
   }
@@ -49,4 +56,3 @@ export class JobsController {
     return this.jobsService.retry(id);
   }
 }
-

@@ -51,12 +51,16 @@ export class FacebookAdapter implements PlatformAdapter {
       this.configService.get<string>('FACEBOOK_CLIENT_ID') ||
       this.configService.get<string>('FACEBOOK_APP_ID') ||
       '';
-    const scope = 'pages_show_list,pages_read_engagement,pages_manage_posts,publish_video';
+    const scope =
+      'pages_show_list,pages_read_engagement,pages_manage_posts,publish_video';
     const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code&state=${encodeURIComponent(state)}`;
     return { url, state };
   }
 
-  async handleCallback(code: string, redirectUri: string): Promise<OAuthTokenResult> {
+  async handleCallback(
+    code: string,
+    redirectUri: string,
+  ): Promise<OAuthTokenResult> {
     const appId =
       this.configService.get<string>('FACEBOOK_CLIENT_ID') ||
       this.configService.get<string>('FACEBOOK_APP_ID') ||
@@ -96,7 +100,9 @@ export class FacebookAdapter implements PlatformAdapter {
       const pageAccessToken = page.access_token || userToken;
 
       if (!accountId || accountId === 'facebook_page') {
-        throw new Error('Could not resolve valid Facebook Page ID from user accounts.');
+        throw new Error(
+          'Could not resolve valid Facebook Page ID from user accounts.',
+        );
       }
 
       return {
@@ -109,26 +115,35 @@ export class FacebookAdapter implements PlatformAdapter {
       if (axios.isAxiosError(err) && err.response?.data?.error) {
         const metaErr = err.response.data.error;
         this.logger.error(`Facebook OAuth error: ${JSON.stringify(metaErr)}`);
-        throw new Error(`Facebook OAuth token exchange failed: ${metaErr.message || JSON.stringify(metaErr)}`);
+        throw new Error(
+          `Facebook OAuth token exchange failed: ${metaErr.message || JSON.stringify(metaErr)}`,
+        );
       }
       throw err;
     }
   }
 
-  async publish(account: PlatformAccount, params: PublishParams): Promise<PublishResult> {
+  async publish(
+    account: PlatformAccount,
+    params: PublishParams,
+  ): Promise<PublishResult> {
     const decryptedToken = this.encryptionService.decrypt(account.accessToken);
 
     if (!this.isConfigured() || !decryptedToken || !account.accountId) {
-      this.logger.warn(`Facebook Reels publishing failed: Adapter not fully configured or missing page token/ID for account ${account.id}`);
+      this.logger.warn(
+        `Facebook Reels publishing failed: Adapter not fully configured or missing page token/ID for account ${account.id}`,
+      );
       return {
         success: false,
         errorCode: 'NOT_CONFIGURED',
-        errorMessage: 'Facebook Reels API is not fully configured with Graph API app credentials or connected Page account.',
+        errorMessage:
+          'Facebook Reels API is not fully configured with Graph API app credentials or connected Page account.',
       };
     }
 
     try {
-      const description = params.description || params.caption || params.title || '';
+      const description =
+        params.description || params.caption || params.title || '';
 
       // Step 1: Start upload phase for Facebook Video Reel
       const startRes = await axios.post(
@@ -146,7 +161,8 @@ export class FacebookAdapter implements PlatformAdapter {
         return {
           success: false,
           errorCode: 'REEL_START_FAILED',
-          errorMessage: 'Facebook Graph API did not initialize Reel upload session.',
+          errorMessage:
+            'Facebook Graph API did not initialize Reel upload session.',
           rawResponse: startRes.data,
         };
       }
@@ -156,7 +172,7 @@ export class FacebookAdapter implements PlatformAdapter {
         await axios.post(uploadUrl, params.videoBuffer, {
           headers: {
             Authorization: `OAuth ${decryptedToken}`,
-            'file_url': params.downloadUrl,
+            file_url: params.downloadUrl,
           },
         });
       }
@@ -181,20 +197,33 @@ export class FacebookAdapter implements PlatformAdapter {
         rawResponse: finishRes.data,
       };
     } catch (error: any) {
-      this.logger.error(`Facebook Reels publish request failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Facebook Reels publish request failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         errorCode: error.response?.data?.error?.code || 'FACEBOOK_API_ERROR',
-        errorMessage: error.response?.data?.error?.message || error.message || 'Error executing Facebook API request.',
+        errorMessage:
+          error.response?.data?.error?.message ||
+          error.message ||
+          'Error executing Facebook API request.',
         rawResponse: error.response?.data,
       };
     }
   }
 
-  async getPostStatus(account: PlatformAccount, platformPostId: string): Promise<PublishResult> {
+  async getPostStatus(
+    account: PlatformAccount,
+    platformPostId: string,
+  ): Promise<PublishResult> {
     const decryptedToken = this.encryptionService.decrypt(account.accessToken);
     if (!decryptedToken) {
-      return { success: false, errorCode: 'NOT_CONFIGURED', errorMessage: 'Missing access token.' };
+      return {
+        success: false,
+        errorCode: 'NOT_CONFIGURED',
+        errorMessage: 'Missing access token.',
+      };
     }
 
     try {
@@ -209,14 +238,28 @@ export class FacebookAdapter implements PlatformAdapter {
         rawResponse: response.data,
       };
     } catch (error: any) {
-      return { success: false, errorCode: 'STATUS_CHECK_FAILED', errorMessage: error.message };
+      return {
+        success: false,
+        errorCode: 'STATUS_CHECK_FAILED',
+        errorMessage: error.message,
+      };
     }
   }
 
-  async fetchAnalytics(account: PlatformAccount, platformPostId: string): Promise<PlatformMetrics> {
+  async fetchAnalytics(
+    account: PlatformAccount,
+    platformPostId: string,
+  ): Promise<PlatformMetrics> {
     const decryptedToken = this.encryptionService.decrypt(account.accessToken);
     if (!decryptedToken) {
-      return { views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0 };
+      return {
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        saves: 0,
+        clicks: 0,
+      };
     }
 
     try {
@@ -229,7 +272,8 @@ export class FacebookAdapter implements PlatformAdapter {
       const likes = Number(data.likes?.summary?.total_count || 0);
       const comments = Number(data.comments?.summary?.total_count || 0);
       const shares = Number(data.shares?.count || 0);
-      const engagementRate = views > 0 ? (likes + comments + shares) / views : 0;
+      const engagementRate =
+        views > 0 ? (likes + comments + shares) / views : 0;
 
       return {
         views,
@@ -242,8 +286,17 @@ export class FacebookAdapter implements PlatformAdapter {
         rawMetadata: data,
       };
     } catch (error) {
-      this.logger.warn(`Failed to fetch Facebook analytics for post ${platformPostId}: ${(error as Error).message}`);
-      return { views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0 };
+      this.logger.warn(
+        `Failed to fetch Facebook analytics for post ${platformPostId}: ${(error as Error).message}`,
+      );
+      return {
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        saves: 0,
+        clicks: 0,
+      };
     }
   }
 }

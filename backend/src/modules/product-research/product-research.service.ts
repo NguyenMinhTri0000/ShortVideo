@@ -63,7 +63,8 @@ export class ProductResearchService {
     // Resolve & normalize URL before adapter selection
     const resolved = await this.resolver.resolveAndNormalizeUrl(cleanedUrl);
     const targetUrl = resolved.canonicalUrl || resolved.finalUrl;
-    const adapter = this.selectAdapter(targetUrl) || this.selectAdapter(cleanedUrl);
+    const adapter =
+      this.selectAdapter(targetUrl) || this.selectAdapter(cleanedUrl);
 
     if (!adapter) {
       return {
@@ -76,7 +77,7 @@ export class ProductResearchService {
     }
 
     // Create pending Product record
-    let product = await this.prisma.product.create({
+    const product = await this.prisma.product.create({
       data: {
         name: 'Đang nghiên cứu sản phẩm...',
         affiliateUrl: cleanedUrl,
@@ -86,7 +87,9 @@ export class ProductResearchService {
       },
     });
 
-    this.logger.log(`[Database] Initial pending Product created: ${product.id}`);
+    this.logger.log(
+      `[Database] Initial pending Product created: ${product.id}`,
+    );
 
     let jobId: string | undefined;
 
@@ -96,10 +99,17 @@ export class ProductResearchService {
         const job = await this.researchQueue.add(
           'process-product-research',
           { productId: product.id, url: cleanedUrl },
-          { attempts: 2, backoff: 5000, removeOnComplete: 100, removeOnFail: 200 },
+          {
+            attempts: 2,
+            backoff: 5000,
+            removeOnComplete: 100,
+            removeOnFail: 200,
+          },
         );
         jobId = job.id;
-        this.logger.log(`[Worker] Enqueued research job ${jobId} for product ${product.id}`);
+        this.logger.log(
+          `[Worker] Enqueued research job ${jobId} for product ${product.id}`,
+        );
 
         await this.prisma.product.update({
           where: { id: product.id },
@@ -111,13 +121,17 @@ export class ProductResearchService {
         );
         // Fallback to inline async execution
         this.executeResearchPipeline(product.id, cleanedUrl).catch((err) => {
-          this.logger.error(`[Worker] Async inline research pipeline error: ${err}`);
+          this.logger.error(
+            `[Worker] Async inline research pipeline error: ${err}`,
+          );
         });
       }
     } else {
       // Fallback to inline async execution
       this.executeResearchPipeline(product.id, cleanedUrl).catch((err) => {
-        this.logger.error(`[Worker] Async inline research pipeline error: ${err}`);
+        this.logger.error(
+          `[Worker] Async inline research pipeline error: ${err}`,
+        );
       });
     }
 
@@ -136,7 +150,9 @@ export class ProductResearchService {
     productId: string,
     url: string,
   ): Promise<ProductResearchResult> {
-    this.logger.log(`[ProductResearch] Executing pipeline for productId=${productId}`);
+    this.logger.log(
+      `[ProductResearch] Executing pipeline for productId=${productId}`,
+    );
 
     await this.prisma.product.update({
       where: { id: productId },
@@ -154,12 +170,20 @@ export class ProductResearchService {
     try {
       // Step 1: Extraction
       const platformName = adapter.name === 'shopee' ? 'Shopee' : adapter.name;
-      this.logger.log(`[ProductResearch] Starting ${platformName} product extraction...`);
+      this.logger.log(
+        `[ProductResearch] Starting ${platformName} product extraction...`,
+      );
       const rawData: RawProductData = await adapter.extract(targetUrl);
 
-      if (!rawData.title && !rawData.description && rawData.images.length === 0) {
+      if (
+        !rawData.title &&
+        !rawData.description &&
+        rawData.images.length === 0
+      ) {
         if (resolved.platform === 'shopee') {
-          throw new Error('Shopee product URL was resolved, but shop ID/item ID could not be extracted.');
+          throw new Error(
+            'Shopee product URL was resolved, but shop ID/item ID could not be extracted.',
+          );
         }
         throw new Error(
           'Không thể trích xuất thông tin sản phẩm từ trang này. Trang có thể bị chặn hoặc không có nội dung.',
@@ -186,17 +210,23 @@ export class ProductResearchService {
       }
 
       // Step 3: Content Brief Generation
-      this.logger.log(`[ContentBrief] Generating reusable Product Content Brief...`);
+      this.logger.log(
+        `[ContentBrief] Generating reusable Product Content Brief...`,
+      );
       const contentBrief = aiAnalysis
         ? this.contentBriefService.generateBrief(rawData, aiAnalysis)
         : null;
 
       // Step 4: DB Update
-      const finalStatus = isPartial ? ResearchStatus.PARTIAL : ResearchStatus.COMPLETED;
+      const finalStatus = isPartial
+        ? ResearchStatus.PARTIAL
+        : ResearchStatus.COMPLETED;
 
       const derivedName =
         rawData.title?.trim() ||
-        (contentBrief?.product && contentBrief.product !== 'Sản phẩm' ? contentBrief.product : null) ||
+        (contentBrief?.product && contentBrief.product !== 'Sản phẩm'
+          ? contentBrief.product
+          : null) ||
         (rawData.brand ? `Sản phẩm ${rawData.brand}` : null) ||
         (rawData.description ? rawData.description.substring(0, 60) : null) ||
         `Sản phẩm từ ${adapter.name}`;
@@ -250,17 +280,24 @@ export class ProductResearchService {
       );
 
       // Trigger Automatic Product Asset Discovery asynchronously
-      this.assetDiscoveryService.discoverAndImportAssets(updatedProduct.id).catch((err) => {
-        this.logger.error(`[AssetDiscovery] Automatic asset discovery error: ${err}`);
-      });
+      this.assetDiscoveryService
+        .discoverAndImportAssets(updatedProduct.id)
+        .catch((err) => {
+          this.logger.error(
+            `[AssetDiscovery] Automatic asset discovery error: ${err}`,
+          );
+        });
 
       return {
         success: true,
         product: this.mapProductToResult(updatedProduct),
       };
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`[ProductResearch] Pipeline failed for productId=${productId}: ${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `[ProductResearch] Pipeline failed for productId=${productId}: ${errorMessage}`,
+      );
 
       const failedProduct = await this.prisma.product
         .update({
@@ -275,7 +312,9 @@ export class ProductResearchService {
 
       return {
         success: false,
-        product: failedProduct ? this.mapProductToResult(failedProduct) : undefined,
+        product: failedProduct
+          ? this.mapProductToResult(failedProduct)
+          : undefined,
         error: {
           code: 'RESEARCH_FAILED',
           message: errorMessage,
@@ -343,7 +382,7 @@ export class ProductResearchService {
       usp: product.usp || [],
       painPoints: product.painPoints || [],
       marketingAngles: product.marketingAngles as MarketingAngle[] | null,
-      contentBrief: product.contentBrief as any,
+      contentBrief: product.contentBrief,
       researchStatus: product.researchStatus || null,
       researchError: product.researchError || null,
       researchedAt: product.researchedAt || null,

@@ -31,6 +31,9 @@ export class ScriptEngineController {
     @Param('id') scriptId: string,
     @Body() config?: VideoJobConfig,
   ) {
-    return this.scriptEngineService.generateVideoFromScript(scriptId, config || {});
+    return this.scriptEngineService.generateVideoFromScript(
+      scriptId,
+      config || {},
+    );
   }
 }

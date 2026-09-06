@@ -40,7 +40,11 @@ export class ShopeeAdapter extends ProductSourceAdapter {
     // Clean Shopee image URLs (remove SVG icons, @resize_... and thumbnail suffixes)
     const shopeeImages: string[] = [];
     for (const rawImg of rawData.images || []) {
-      if (!rawImg || rawImg.endsWith('.svg') || rawImg.includes('shopeemobile.com')) {
+      if (
+        !rawImg ||
+        rawImg.endsWith('.svg') ||
+        rawImg.includes('shopeemobile.com')
+      ) {
         continue;
       }
       const cleanImg = rawImg

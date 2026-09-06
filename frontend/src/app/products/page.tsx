@@ -36,6 +36,7 @@ import {
   ArrowUp,
   ArrowDown,
   Play,
+  PlayCircle,
   Film,
   Link2,
   FileVideo,
@@ -195,6 +196,12 @@ export default function ProductsPage() {
   const [activeScriptModal, setActiveScriptModal] = useState<VideoScript | null>(null);
   const [generatingVideoScriptId, setGeneratingVideoScriptId] = useState<string | null>(null);
   const [previewMediaUrl, setPreviewMediaUrl] = useState<{ url: string; type: "image" | "video" } | null>(null);
+  const [createdVideoSuccess, setCreatedVideoSuccess] = useState<{
+    title?: string;
+    scriptTitle?: string;
+    message: string;
+    jobId?: string;
+  } | null>(null);
 
   // Visual Assets State & Handlers
   const [activeAssetSubTab, setActiveAssetSubTab] = useState<"images" | "videos">("images");
@@ -314,7 +321,10 @@ export default function ProductsPage() {
     try {
       setIsGeneratingIdeas(true);
       const res = await api.post(`/products/${productId}/content-ideas/batch-generate-videos`, { limit });
-      alert(`Thành công! Đã tự động kích hoạt tạo ${res.data.count} Job video từ các góc nhìn xuất sắc nhất.`);
+      setCreatedVideoSuccess({
+        title: "Tạo Video Hàng Loạt Thành Công",
+        message: `Đã tự động kích hoạt tạo ${res.data.count} Job video từ các góc nhìn xuất sắc nhất. Các job đã được đưa vào hàng đợi xử lý!`,
+      });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["content-ideas", selectedProduct?.id] });
     } catch (err: any) {
@@ -327,8 +337,12 @@ export default function ProductsPage() {
   const handleGenerateVideoFromIdea = async (ideaId: string) => {
     try {
       setSelectedIdeaForVideoId(ideaId);
-      await api.post(`/content-ideas/${ideaId}/generate-video`);
-      alert("Đã tạo Job video từ ý tưởng này thành công! Video đang được tạo trong hàng đợi.");
+      const res = await api.post(`/content-ideas/${ideaId}/generate-video`);
+      setCreatedVideoSuccess({
+        title: "Đã Tạo Job Video Từ Ý Tưởng",
+        message: "Đã gửi yêu cầu tạo video thành công! Video đang được xếp vào hàng đợi xử lý.",
+        jobId: res.data?.job?.id,
+      });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["content-ideas", selectedProduct?.id] });
     } catch (err: any) {
@@ -368,11 +382,17 @@ export default function ProductsPage() {
   };
 
   const handleGenerateVideoFromScript = async (scriptId: string) => {
+    const currentScript = activeScriptModal;
     try {
       setGeneratingVideoScriptId(scriptId);
-      await api.post(`/scripts/${scriptId}/generate-video`);
-      alert("Đã gửi kịch bản 2.0 sang Video Generation Engine thành công!");
+      const res = await api.post(`/scripts/${scriptId}/generate-video`);
       setActiveScriptModal(null);
+      setCreatedVideoSuccess({
+        title: "Tạo Video Từ Kịch Bản 2.0 Thành Công!",
+        scriptTitle: currentScript?.title,
+        message: "Đã gửi kịch bản 2.0 sang Video Generation Engine thành công! Video đang được xử lý trong hàng đợi.",
+        jobId: res.data?.job?.id,
+      });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["content-ideas", selectedProduct?.id] });
     } catch (err: any) {
@@ -2115,6 +2135,58 @@ export default function ProductsPage() {
               )}
               Khởi tạo Job Sinh Video
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Video Generation Success Modal with Jump to Queue (Jobs) button */}
+      {createdVideoSuccess && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl space-y-5 text-center">
+            <button
+              onClick={() => setCreatedVideoSuccess(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-zinc-900 text-zinc-400 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-violet-600/15 border border-violet-500/30 flex items-center justify-center text-violet-400 shadow-xl shadow-violet-500/10">
+              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-zinc-100">
+                {createdVideoSuccess.title || "Đã Tạo Video Thành Công!"}
+              </h3>
+              {createdVideoSuccess.scriptTitle && (
+                <div className="inline-block max-w-full">
+                  <p className="text-xs font-semibold text-violet-300 bg-violet-950/80 px-3 py-1 rounded-lg border border-violet-800/40 truncate">
+                    {createdVideoSuccess.scriptTitle}
+                  </p>
+                </div>
+              )}
+              <p className="text-xs text-zinc-400 leading-relaxed pt-1">
+                {createdVideoSuccess.message}
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+              <button
+                onClick={() => setCreatedVideoSuccess(null)}
+                className="w-full py-2.5 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-semibold border border-zinc-800 transition-colors"
+              >
+                Ở lại trang này
+              </button>
+
+              <Link
+                href="/jobs"
+                onClick={() => setCreatedVideoSuccess(null)}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-violet-600/30 flex items-center justify-center gap-2 transition-all group"
+              >
+                <PlayCircle className="w-4 h-4 text-violet-200 group-hover:scale-110 transition-transform" />
+                <span>Đến Hàng Đợi (Jobs)</span>
+              </Link>
+            </div>
           </div>
         </div>
       )}

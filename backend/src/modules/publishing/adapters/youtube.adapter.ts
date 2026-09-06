@@ -25,20 +25,27 @@ export class YouTubeAdapter implements PlatformAdapter {
 
   isConfigured(): boolean {
     const clientId = this.configService.get<string>('YOUTUBE_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('YOUTUBE_CLIENT_SECRET');
+    const clientSecret = this.configService.get<string>(
+      'YOUTUBE_CLIENT_SECRET',
+    );
     return Boolean(clientId && clientSecret);
   }
 
   getAuthUrl(redirectUri: string, state = 'youtube_auth'): OAuthAuthUrlResult {
     const clientId = this.configService.get<string>('YOUTUBE_CLIENT_ID') || '';
-    const scope = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly';
+    const scope =
+      'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly';
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&response_type=code&scope=${encodeURIComponent(scope)}&redirect_uri=${encodeURIComponent(redirectUri)}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
     return { url, state };
   }
 
-  async handleCallback(code: string, redirectUri: string): Promise<OAuthTokenResult> {
+  async handleCallback(
+    code: string,
+    redirectUri: string,
+  ): Promise<OAuthTokenResult> {
     const clientId = this.configService.get<string>('YOUTUBE_CLIENT_ID') || '';
-    const clientSecret = this.configService.get<string>('YOUTUBE_CLIENT_SECRET') || '';
+    const clientSecret =
+      this.configService.get<string>('YOUTUBE_CLIENT_SECRET') || '';
 
     if (!clientId || !clientSecret) {
       throw new Error('YouTube client ID or secret is not configured.');
@@ -93,12 +100,17 @@ export class YouTubeAdapter implements PlatformAdapter {
   }
 
   async refreshAuthToken(account: PlatformAccount): Promise<OAuthTokenResult> {
-    const decryptedRefreshToken = this.encryptionService.decrypt(account.refreshToken);
+    const decryptedRefreshToken = this.encryptionService.decrypt(
+      account.refreshToken,
+    );
     const clientId = this.configService.get<string>('YOUTUBE_CLIENT_ID') || '';
-    const clientSecret = this.configService.get<string>('YOUTUBE_CLIENT_SECRET') || '';
+    const clientSecret =
+      this.configService.get<string>('YOUTUBE_CLIENT_SECRET') || '';
 
     if (!decryptedRefreshToken || !clientId || !clientSecret) {
-      throw new Error('Cannot refresh token: missing refresh token or client credentials.');
+      throw new Error(
+        'Cannot refresh token: missing refresh token or client credentials.',
+      );
     }
 
     const response = await axios.post(
@@ -124,21 +136,33 @@ export class YouTubeAdapter implements PlatformAdapter {
     };
   }
 
-  async publish(account: PlatformAccount, params: PublishParams): Promise<PublishResult> {
+  async publish(
+    account: PlatformAccount,
+    params: PublishParams,
+  ): Promise<PublishResult> {
     const decryptedToken = this.encryptionService.decrypt(account.accessToken);
 
     if (!decryptedToken) {
-      this.logger.warn(`YouTube Shorts publishing failed: missing token for account ${account.id}`);
+      this.logger.warn(
+        `YouTube Shorts publishing failed: missing token for account ${account.id}`,
+      );
       return {
         success: false,
         errorCode: 'NOT_CONFIGURED',
-        errorMessage: 'YouTube Shorts API requires a valid user token to publish videos.',
+        errorMessage:
+          'YouTube Shorts API requires a valid user token to publish videos.',
       };
     }
 
     try {
       const title = (params.title || 'Affiliate Short Video').slice(0, 100);
-      const description = [params.description || params.caption || '', '#Shorts', ...(params.hashtags || []).map((h) => (h.startsWith('#') ? h : `#${h}`))]
+      const description = [
+        params.description || params.caption || '',
+        '#Shorts',
+        ...(params.hashtags || []).map((h) =>
+          h.startsWith('#') ? h : `#${h}`,
+        ),
+      ]
         .filter(Boolean)
         .join(' ')
         .slice(0, 5000);
@@ -184,10 +208,14 @@ export class YouTubeAdapter implements PlatformAdapter {
 
       if (uploadUrl && !bufferToUpload && params.downloadUrl) {
         try {
-          const downloadRes = await axios.get(params.downloadUrl, { responseType: 'arraybuffer' });
+          const downloadRes = await axios.get(params.downloadUrl, {
+            responseType: 'arraybuffer',
+          });
           bufferToUpload = Buffer.from(downloadRes.data);
         } catch (downloadErr: any) {
-          this.logger.error(`Failed to download video bytes from downloadUrl: ${downloadErr.message || downloadErr}`);
+          this.logger.error(
+            `Failed to download video bytes from downloadUrl: ${downloadErr.message || downloadErr}`,
+          );
         }
       }
 
@@ -217,23 +245,39 @@ export class YouTubeAdapter implements PlatformAdapter {
         rawResponse: initResponse.data,
       };
     } catch (error: any) {
-      this.logger.error(`YouTube Shorts upload failed: ${error.message}`, error.stack);
-      const is401 = error.response?.status === 401 || error.response?.data?.error?.code === 401;
+      this.logger.error(
+        `YouTube Shorts upload failed: ${error.message}`,
+        error.stack,
+      );
+      const is401 =
+        error.response?.status === 401 ||
+        error.response?.data?.error?.code === 401;
       return {
         success: false,
-        errorCode: is401 ? '401' : (error.response?.data?.error?.code || 'YOUTUBE_API_ERROR'),
+        errorCode: is401
+          ? '401'
+          : error.response?.data?.error?.code || 'YOUTUBE_API_ERROR',
         errorMessage: is401
           ? 'Phiên đăng nhập YouTube đã hết hạn (Google OAuth 401). Vui lòng nhấn nút "Sign in YouTube Account" ở trên để kết nối lại tài khoản.'
-          : (error.response?.data?.error?.message || error.message || 'Failed to publish video to YouTube Shorts.'),
+          : error.response?.data?.error?.message ||
+            error.message ||
+            'Failed to publish video to YouTube Shorts.',
         rawResponse: error.response?.data,
       };
     }
   }
 
-  async getPostStatus(account: PlatformAccount, platformPostId: string): Promise<PublishResult> {
+  async getPostStatus(
+    account: PlatformAccount,
+    platformPostId: string,
+  ): Promise<PublishResult> {
     const decryptedToken = this.encryptionService.decrypt(account.accessToken);
     if (!decryptedToken) {
-      return { success: false, errorCode: 'NOT_CONFIGURED', errorMessage: 'Missing access token.' };
+      return {
+        success: false,
+        errorCode: 'NOT_CONFIGURED',
+        errorMessage: 'Missing access token.',
+      };
     }
 
     try {
@@ -246,7 +290,11 @@ export class YouTubeAdapter implements PlatformAdapter {
 
       const item = response.data?.items?.[0];
       if (!item) {
-        return { success: false, errorCode: 'POST_NOT_FOUND', errorMessage: 'YouTube video not found.' };
+        return {
+          success: false,
+          errorCode: 'POST_NOT_FOUND',
+          errorMessage: 'YouTube video not found.',
+        };
       }
 
       const status = item.status?.uploadStatus || 'processed';
@@ -257,14 +305,28 @@ export class YouTubeAdapter implements PlatformAdapter {
         rawResponse: response.data,
       };
     } catch (error: any) {
-      return { success: false, errorCode: 'STATUS_CHECK_FAILED', errorMessage: error.message };
+      return {
+        success: false,
+        errorCode: 'STATUS_CHECK_FAILED',
+        errorMessage: error.message,
+      };
     }
   }
 
-  async fetchAnalytics(account: PlatformAccount, platformPostId: string): Promise<PlatformMetrics> {
+  async fetchAnalytics(
+    account: PlatformAccount,
+    platformPostId: string,
+  ): Promise<PlatformMetrics> {
     const decryptedToken = this.encryptionService.decrypt(account.accessToken);
     if (!decryptedToken) {
-      return { views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0 };
+      return {
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        saves: 0,
+        clicks: 0,
+      };
     }
 
     try {
@@ -292,8 +354,17 @@ export class YouTubeAdapter implements PlatformAdapter {
         rawMetadata: response.data,
       };
     } catch (error) {
-      this.logger.warn(`Failed to fetch YouTube analytics for post ${platformPostId}: ${(error as Error).message}`);
-      return { views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0 };
+      this.logger.warn(
+        `Failed to fetch YouTube analytics for post ${platformPostId}: ${(error as Error).message}`,
+      );
+      return {
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        saves: 0,
+        clicks: 0,
+      };
     }
   }
 }

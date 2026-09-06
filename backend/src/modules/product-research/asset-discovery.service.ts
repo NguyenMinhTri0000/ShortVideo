@@ -80,7 +80,8 @@ export class AssetDiscoveryService {
     const uniqueQueries = Array.from(new Set(queries.filter(Boolean)));
 
     this.logger.log(
-      `[Queries]\n` + uniqueQueries.map((q, idx) => `- query ${idx + 1}: "${q}"`).join('\n'),
+      `[Queries]\n` +
+        uniqueQueries.map((q, idx) => `- query ${idx + 1}: "${q}"`).join('\n'),
     );
 
     const candidateUrls: string[] = [];
@@ -112,14 +113,20 @@ export class AssetDiscoveryService {
           );
         }
       } catch (fallbackErr) {
-        this.logger.warn(`[Fallback] Source URL extraction failed: ${fallbackErr}`);
+        this.logger.warn(
+          `[Fallback] Source URL extraction failed: ${fallbackErr}`,
+        );
       }
     }
 
-    this.logger.log(`[Extraction]\nImages found: ${candidateUrls.length}\nVideos found: 0`);
+    this.logger.log(
+      `[Extraction]\nImages found: ${candidateUrls.length}\nVideos found: 0`,
+    );
 
     if (candidateUrls.length === 0) {
-      this.logger.warn(`[AssetDiscovery] No valid candidate images found for product ${productId}`);
+      this.logger.warn(
+        `[AssetDiscovery] No valid candidate images found for product ${productId}`,
+      );
       return {
         success: true,
         importedCount: 0,
@@ -150,10 +157,16 @@ export class AssetDiscoveryService {
 
     // Import Candidate Images
     const newlyImportedUrls: string[] = [];
-    let duplicateCount = rejectedCandidates.filter((r) => r.includes('(duplicate)')).length;
+    const duplicateCount = rejectedCandidates.filter((r) =>
+      r.includes('(duplicate)'),
+    ).length;
     let failedCount = 0;
 
-    for (let i = 0; i < acceptedCandidates.length && newlyImportedUrls.length < maxImages; i++) {
+    for (
+      let i = 0;
+      i < acceptedCandidates.length && newlyImportedUrls.length < maxImages;
+      i++
+    ) {
       const imgUrl = acceptedCandidates[i];
       try {
         const importedUrl = await this.downloadAndStoreImage(imgUrl, productId);
@@ -238,7 +251,11 @@ export class AssetDiscoveryService {
     if (!url || typeof url !== 'string') return false;
     if (!url.startsWith('http://') && !url.startsWith('https://')) return false;
     const lower = url.toLowerCase();
-    if (lower.includes('data:image/') || lower.endsWith('.svg') || lower.endsWith('.gif')) {
+    if (
+      lower.includes('data:image/') ||
+      lower.endsWith('.svg') ||
+      lower.endsWith('.gif')
+    ) {
       return false;
     }
     if (
@@ -281,8 +298,8 @@ export class AssetDiscoveryService {
     const ext = contentType.includes('png')
       ? 'png'
       : contentType.includes('webp')
-      ? 'webp'
-      : 'jpg';
+        ? 'webp'
+        : 'jpg';
     const timestamp = Date.now();
     const rand = Math.floor(Math.random() * 10000);
     const key = `product-assets/discovered-${productId.substring(0, 8)}-${timestamp}-${rand}.${ext}`;

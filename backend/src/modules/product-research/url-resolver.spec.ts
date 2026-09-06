@@ -19,7 +19,9 @@ describe('UrlResolverService Unit Tests', () => {
       expect(shopeeIds).toBeDefined();
       expect(shopeeIds?.shopId).toBe('1016604648');
       expect(shopeeIds?.itemId).toBe('23552060269');
-      expect(shopeeIds?.canonicalUrl).toBe('https://shopee.vn/product/1016604648/23552060269');
+      expect(shopeeIds?.canonicalUrl).toBe(
+        'https://shopee.vn/product/1016604648/23552060269',
+      );
     });
 
     it('Test 2 — Direct Shopee URL with affiliate parameters', async () => {
@@ -32,7 +34,9 @@ describe('UrlResolverService Unit Tests', () => {
       expect(shopeeIds).toBeDefined();
       expect(shopeeIds?.shopId).toBe('1016604648');
       expect(shopeeIds?.itemId).toBe('23552060269');
-      expect(shopeeIds?.canonicalUrl).toBe('https://shopee.vn/product/1016604648/23552060269');
+      expect(shopeeIds?.canonicalUrl).toBe(
+        'https://shopee.vn/product/1016604648/23552060269',
+      );
     });
 
     it('Test 3 — Shopee short affiliate URL domain detection', () => {
@@ -43,16 +47,20 @@ describe('UrlResolverService Unit Tests', () => {
     });
 
     it('Extracts Shopee IDs from custom store path (/opaanlp/{shopId}/{itemId})', () => {
-      const url = 'https://shopee.vn/opaanlp/1016604648/23552060269?__mobile__=1';
+      const url =
+        'https://shopee.vn/opaanlp/1016604648/23552060269?__mobile__=1';
       const shopeeIds = resolver.extractShopeeIds(url);
       expect(shopeeIds).toBeDefined();
       expect(shopeeIds?.shopId).toBe('1016604648');
       expect(shopeeIds?.itemId).toBe('23552060269');
-      expect(shopeeIds?.canonicalUrl).toBe('https://shopee.vn/product/1016604648/23552060269');
+      expect(shopeeIds?.canonicalUrl).toBe(
+        'https://shopee.vn/product/1016604648/23552060269',
+      );
     });
 
     it('Extracts Shopee IDs from -i format (/-i.{shopId}.{itemId})', () => {
-      const url = 'https://shopee.vn/Giay-ve-sinh-TopGia-i.1016604648.23552060269';
+      const url =
+        'https://shopee.vn/Giay-ve-sinh-TopGia-i.1016604648.23552060269';
       const shopeeIds = resolver.extractShopeeIds(url);
       expect(shopeeIds).toBeDefined();
       expect(shopeeIds?.shopId).toBe('1016604648');
@@ -70,7 +78,9 @@ describe('UrlResolverService Unit Tests', () => {
         })
         .mockResolvedValueOnce({
           status: 302,
-          headers: new Map([['location', 'https://shopee.vn/product/1016604648/23552060269']]),
+          headers: new Map([
+            ['location', 'https://shopee.vn/product/1016604648/23552060269'],
+          ]),
         })
         .mockResolvedValueOnce({
           status: 200,
@@ -79,10 +89,14 @@ describe('UrlResolverService Unit Tests', () => {
 
       global.fetch = mockFetch as any;
 
-      const result = await resolver.resolveRedirects('https://s.shopee.vn/mock-short');
+      const result = await resolver.resolveRedirects(
+        'https://s.shopee.vn/mock-short',
+      );
 
       expect(result.hops).toBe(2);
-      expect(result.finalUrl).toBe('https://shopee.vn/product/1016604648/23552060269');
+      expect(result.finalUrl).toBe(
+        'https://shopee.vn/product/1016604648/23552060269',
+      );
       expect(result.redirectChain).toEqual([
         'https://s.shopee.vn/mock-short',
         'https://redirect-a.com/step1',
@@ -115,7 +129,9 @@ describe('UrlResolverService Unit Tests', () => {
         count++;
         return Promise.resolve({
           status: 301,
-          headers: new Map([['location', `https://infinite-redirect.com/next-${count}`]]),
+          headers: new Map([
+            ['location', `https://infinite-redirect.com/next-${count}`],
+          ]),
         });
       });
 
@@ -136,15 +152,21 @@ describe('UrlResolverService Unit Tests', () => {
     });
 
     it('Test 7 — Invalid / Unsafe URL validation', async () => {
-      await expect(resolver.resolveAndNormalizeUrl('')).rejects.toThrow(BadRequestException);
-      await expect(resolver.resolveAndNormalizeUrl('not-a-url')).rejects.toThrow(BadRequestException);
-      await expect(resolver.resolveAndNormalizeUrl('https://')).rejects.toThrow(BadRequestException);
-      await expect(resolver.resolveAndNormalizeUrl('http://127.0.0.1/admin')).rejects.toThrow(
-        'Không thể truy cập địa chỉ nội bộ',
+      await expect(resolver.resolveAndNormalizeUrl('')).rejects.toThrow(
+        BadRequestException,
       );
-      await expect(resolver.resolveAndNormalizeUrl('http://169.254.169.254/metadata')).rejects.toThrow(
-        'Không thể truy cập địa chỉ nội bộ',
+      await expect(
+        resolver.resolveAndNormalizeUrl('not-a-url'),
+      ).rejects.toThrow(BadRequestException);
+      await expect(resolver.resolveAndNormalizeUrl('https://')).rejects.toThrow(
+        BadRequestException,
       );
+      await expect(
+        resolver.resolveAndNormalizeUrl('http://127.0.0.1/admin'),
+      ).rejects.toThrow('Không thể truy cập địa chỉ nội bộ');
+      await expect(
+        resolver.resolveAndNormalizeUrl('http://169.254.169.254/metadata'),
+      ).rejects.toThrow('Không thể truy cập địa chỉ nội bộ');
     });
 
     it('Test 8 — Redaction of sensitive parameters in logs', () => {

@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Delete,
-  Param,
-  Body,
-} from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Body } from '@nestjs/common';
 import { ContentStrategyService } from './content-strategy.service';
 import type { VideoJobConfig } from '../queue/queue.service';
 
@@ -46,7 +39,8 @@ export class ContentStrategyController {
   @Post('products/:id/content-ideas/batch-generate-videos')
   batchGenerateVideos(
     @Param('id') productId: string,
-    @Body() body: { ideaIds?: string[]; limit?: number; config?: VideoJobConfig } = {},
+    @Body()
+    body: { ideaIds?: string[]; limit?: number; config?: VideoJobConfig } = {},
   ) {
     return this.contentStrategyService.batchGenerateVideosFromIdeas(
       productId,

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { JobsService } from '../jobs/jobs.service';
@@ -45,7 +49,10 @@ export class VideosService {
     });
   }
 
-  async uploadVideo(file: { buffer: Buffer; originalname?: string; mimetype?: string }, title?: string) {
+  async uploadVideo(
+    file: { buffer: Buffer; originalname?: string; mimetype?: string },
+    title?: string,
+  ) {
     if (!file || !file.buffer) {
       throw new BadRequestException('Vui lòng chọn file video hợp lệ');
     }
@@ -97,7 +104,9 @@ export class VideosService {
   async regenerate(id: string) {
     const video = await this.getVideoOrThrow(id);
     if (!video.jobId) {
-      throw new BadRequestException('Video này được tải lên thủ công, không có công việc sinh tự động để tạo lại.');
+      throw new BadRequestException(
+        'Video này được tải lên thủ công, không có công việc sinh tự động để tạo lại.',
+      );
     }
     return this.jobsService.retry(video.jobId);
   }

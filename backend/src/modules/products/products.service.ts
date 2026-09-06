@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { QueueService, type VideoJobConfig } from '../queue/queue.service';
 import { StorageService } from '../storage/storage.service';
@@ -56,7 +61,9 @@ export class ProductsService {
     const key = `product-assets/${timestamp}-${cleanFilename}`;
     const contentType = file.mimetype || 'application/octet-stream';
 
-    this.logger.log(`[ProductsService] Uploading asset ${key} (${file.size} bytes, ${contentType})`);
+    this.logger.log(
+      `[ProductsService] Uploading asset ${key} (${file.size} bytes, ${contentType})`,
+    );
     await this.storageService.uploadBuffer(file.buffer, key, contentType);
 
     const url = await this.storageService.getDownloadUrl(key, 86400 * 365);
@@ -152,9 +159,13 @@ export class ProductsService {
         ...(dto.category !== undefined && { category: dto.category }),
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.price !== undefined && { price: dto.price }),
-        ...(dto.originalPrice !== undefined && { originalPrice: dto.originalPrice }),
+        ...(dto.originalPrice !== undefined && {
+          originalPrice: dto.originalPrice,
+        }),
         ...(dto.currency && { currency: dto.currency }),
-        ...(dto.discountPercent !== undefined && { discountPercent: dto.discountPercent }),
+        ...(dto.discountPercent !== undefined && {
+          discountPercent: dto.discountPercent,
+        }),
         ...(dto.rating !== undefined && { rating: dto.rating }),
         ...(dto.reviewCount !== undefined && { reviewCount: dto.reviewCount }),
         ...(dto.affiliateUrl && { affiliateUrl: dto.affiliateUrl }),
@@ -169,7 +180,9 @@ export class ProductsService {
         ...(dto.benefits && { benefits: dto.benefits }),
         ...(dto.pros && { pros: dto.pros }),
         ...(dto.cons && { cons: dto.cons }),
-        ...(dto.targetAudience !== undefined && { targetAudience: dto.targetAudience }),
+        ...(dto.targetAudience !== undefined && {
+          targetAudience: dto.targetAudience,
+        }),
         ...(dto.useCases && { useCases: dto.useCases }),
         ...(dto.usp && { usp: dto.usp }),
         ...(dto.painPoints && { painPoints: dto.painPoints }),

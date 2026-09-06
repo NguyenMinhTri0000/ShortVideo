@@ -11,14 +11,21 @@ export class AnalyticsProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<{ publishJobId: string; intervalLabel?: string }>): Promise<any> {
+  async process(
+    job: Job<{ publishJobId: string; intervalLabel?: string }>,
+  ): Promise<any> {
     const { publishJobId, intervalLabel } = job.data;
-    this.logger.log(`Processing analytics collection job ${job.id} for publishJobId: ${publishJobId} (Interval: ${intervalLabel || 'on-demand'})`);
+    this.logger.log(
+      `Processing analytics collection job ${job.id} for publishJobId: ${publishJobId} (Interval: ${intervalLabel || 'on-demand'})`,
+    );
 
     await this.analyticsService.collectSnapshotForJob(publishJobId);
 
     if (intervalLabel) {
-      await this.analyticsService.scheduleNextSnapshot(publishJobId, intervalLabel);
+      await this.analyticsService.scheduleNextSnapshot(
+        publishJobId,
+        intervalLabel,
+      );
     }
   }
 }

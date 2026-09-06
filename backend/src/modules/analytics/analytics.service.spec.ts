@@ -83,7 +83,9 @@ describe('AnalyticsService', () => {
           title: 'Video A',
           platform: 'TIKTOK',
           video: { id: 'v-1', title: 'Video A' },
-          analyticsSnapshots: [{ views: BigInt(120000), likes: 8000, comments: 300, shares: 100 }],
+          analyticsSnapshots: [
+            { views: BigInt(120000), likes: 8000, comments: 300, shares: 100 },
+          ],
         },
         {
           id: 'job-2',
@@ -91,7 +93,9 @@ describe('AnalyticsService', () => {
           title: 'Video A',
           platform: 'YOUTUBE',
           video: { id: 'v-1', title: 'Video A' },
-          analyticsSnapshots: [{ views: BigInt(80000), likes: 5000, comments: 200, shares: 50 }],
+          analyticsSnapshots: [
+            { views: BigInt(80000), likes: 5000, comments: 200, shares: 50 },
+          ],
         },
       ]);
 

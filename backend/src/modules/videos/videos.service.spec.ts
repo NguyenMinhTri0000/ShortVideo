@@ -28,7 +28,11 @@ describe('VideosService', () => {
       video: {
         findMany: jest.fn().mockResolvedValue([mockVideo]),
         findUnique: jest.fn().mockResolvedValue(mockVideo),
-        create: jest.fn().mockImplementation((args) => Promise.resolve({ id: 'vid-2', ...args.data })),
+        create: jest
+          .fn()
+          .mockImplementation((args) =>
+            Promise.resolve({ id: 'vid-2', ...args.data }),
+          ),
         delete: jest.fn().mockResolvedValue(mockVideo),
       },
     };
@@ -82,7 +86,9 @@ describe('VideosService', () => {
 
     it('should throw NotFoundException if video does not exist', async () => {
       prisma.video.findUnique.mockResolvedValueOnce(null);
-      await expect(service.findOne('invalid-id')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('invalid-id')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -106,7 +112,9 @@ describe('VideosService', () => {
     });
 
     it('should throw BadRequestException if no file buffer is provided', async () => {
-      await expect(service.uploadVideo({ buffer: null as any })).rejects.toThrow(BadRequestException);
+      await expect(
+        service.uploadVideo({ buffer: null as any }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -115,7 +123,9 @@ describe('VideosService', () => {
       const result = await service.remove('vid-1');
       expect(storage.deleteFile).toHaveBeenCalledWith('videos/test.mp4');
       expect(storage.deleteFile).toHaveBeenCalledWith('thumbnails/test.jpg');
-      expect(prisma.video.delete).toHaveBeenCalledWith({ where: { id: 'vid-1' } });
+      expect(prisma.video.delete).toHaveBeenCalledWith({
+        where: { id: 'vid-1' },
+      });
       expect(result).toEqual(mockVideo);
     });
   });
@@ -128,8 +138,13 @@ describe('VideosService', () => {
     });
 
     it('should throw BadRequestException if video does not have jobId', async () => {
-      prisma.video.findUnique.mockResolvedValueOnce({ ...mockVideo, jobId: null });
-      await expect(service.regenerate('vid-1')).rejects.toThrow(BadRequestException);
+      prisma.video.findUnique.mockResolvedValueOnce({
+        ...mockVideo,
+        jobId: null,
+      });
+      await expect(service.regenerate('vid-1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });

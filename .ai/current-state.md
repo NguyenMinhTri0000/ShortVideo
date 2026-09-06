@@ -19,6 +19,9 @@
   - `TASK-006`: Harden content strategy pipeline against TypeErrors and unhandled 500 errors (`.ai/tasks/TASK-006-harden-content-strategy-pipeline.md`)
   - `TASK-007`: Verify Gemini API Key Functionality (`.ai/tasks/TASK-007-verify-gemini-api-key.md`)
   - `TASK-008`: Fix TypeScript Build Error in ContentStrategyService (`.ai/tasks/TASK-008-fix-content-strategy-build-error.md`)
+  - `TASK-009`: Add navigation button to video generation queue after Script 2.0 video creation (`.ai/tasks/TASK-009-add-navigate-to-video-queue-button.md`)
+  - `TASK-010`: Add granular task error reporting and retry/skip controls (`.ai/tasks/TASK-010-task-error-notification-and-retry-skip-controls.md`)
+  - `TASK-011`: Fix Shopee CDN image download HTTP 404 and implement robust step fallbacks (`.ai/tasks/TASK-011-fix-shopee-image-download-404-and-step-fallbacks.md`)
 - **Blocked Tasks**: None
 - **Next Recommended Task**: `TASK-002`: Clean up existing ESLint technical debt (`.ai/tasks/TASK-002-cleanup-eslint-tech-debt.md`)
 

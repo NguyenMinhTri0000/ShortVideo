@@ -16,7 +16,11 @@ describe('VideosController', () => {
   const mockVideosService = {
     findAll: jest.fn().mockResolvedValue([mockVideo]),
     findOne: jest.fn().mockResolvedValue(mockVideo),
-    uploadVideo: jest.fn().mockResolvedValue({ ...mockVideo, id: 'vid-uploaded', title: 'Uploaded Title' }),
+    uploadVideo: jest.fn().mockResolvedValue({
+      ...mockVideo,
+      id: 'vid-uploaded',
+      title: 'Uploaded Title',
+    }),
     remove: jest.fn().mockResolvedValue(mockVideo),
     regenerate: jest.fn().mockResolvedValue({ success: true }),
     getStream: jest.fn().mockResolvedValue({
@@ -55,10 +59,20 @@ describe('VideosController', () => {
 
   describe('uploadVideo', () => {
     it('should delegate upload to service', async () => {
-      const fakeFile = { buffer: Buffer.from('test'), originalname: 'test.mp4' };
+      const fakeFile = {
+        buffer: Buffer.from('test'),
+        originalname: 'test.mp4',
+      };
       const result = await controller.uploadVideo(fakeFile, 'Uploaded Title');
-      expect(service.uploadVideo).toHaveBeenCalledWith(fakeFile, 'Uploaded Title');
-      expect(result).toEqual({ ...mockVideo, id: 'vid-uploaded', title: 'Uploaded Title' });
+      expect(service.uploadVideo).toHaveBeenCalledWith(
+        fakeFile,
+        'Uploaded Title',
+      );
+      expect(result).toEqual({
+        ...mockVideo,
+        id: 'vid-uploaded',
+        title: 'Uploaded Title',
+      });
     });
   });
 

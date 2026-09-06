@@ -36,7 +36,9 @@ describe('PublishingService', () => {
   };
 
   const mockStorageService = {
-    getDownloadUrl: jest.fn().mockResolvedValue('http://localhost:29000/videos/sample.mp4'),
+    getDownloadUrl: jest
+      .fn()
+      .mockResolvedValue('http://localhost:29000/videos/sample.mp4'),
   };
 
   const mockQueue = {
@@ -53,7 +55,9 @@ describe('PublishingService', () => {
       platformUrl: 'https://www.tiktok.com/@test/video/tiktok_post_123',
       publishedAt: new Date(),
     }),
-    fetchAnalytics: jest.fn().mockResolvedValue({ views: 1000, likes: 100, comments: 10, shares: 5 }),
+    fetchAnalytics: jest
+      .fn()
+      .mockResolvedValue({ views: 1000, likes: 100, comments: 10, shares: 5 }),
   };
 
   const mockYouTubeAdapter = {
@@ -70,13 +74,17 @@ describe('PublishingService', () => {
   const mockInstagramAdapter = {
     platform: 'INSTAGRAM',
     isConfigured: jest.fn().mockReturnValue(false),
-    publish: jest.fn().mockResolvedValue({ success: false, errorCode: 'NOT_CONFIGURED' }),
+    publish: jest
+      .fn()
+      .mockResolvedValue({ success: false, errorCode: 'NOT_CONFIGURED' }),
   };
 
   const mockFacebookAdapter = {
     platform: 'FACEBOOK',
     isConfigured: jest.fn().mockReturnValue(false),
-    publish: jest.fn().mockResolvedValue({ success: false, errorCode: 'NOT_CONFIGURED' }),
+    publish: jest
+      .fn()
+      .mockResolvedValue({ success: false, errorCode: 'NOT_CONFIGURED' }),
   };
 
   beforeEach(async () => {
@@ -94,7 +102,9 @@ describe('PublishingService', () => {
         { provide: getQueueToken('analytics-queue'), useValue: mockQueue },
         {
           provide: ConfigService,
-          useValue: { get: jest.fn().mockReturnValue('test-encryption-secret-32-bytes!') },
+          useValue: {
+            get: jest.fn().mockReturnValue('test-encryption-secret-32-bytes!'),
+          },
         },
       ],
     }).compile();
@@ -131,9 +141,19 @@ describe('PublishingService', () => {
 
   describe('PublishJob Creation & Duplicate Protection', () => {
     it('should reject creation if active publish job already exists for same video and account', async () => {
-      mockPrismaService.video.findUnique.mockResolvedValue({ id: 'v-1', title: 'Video 1' });
-      mockPrismaService.platformAccount.findUnique.mockResolvedValue({ id: 'acc-1', platform: 'TIKTOK', accountName: 'TK' });
-      mockPrismaService.publishJob.findFirst.mockResolvedValue({ id: 'job-existing', status: 'QUEUED' });
+      mockPrismaService.video.findUnique.mockResolvedValue({
+        id: 'v-1',
+        title: 'Video 1',
+      });
+      mockPrismaService.platformAccount.findUnique.mockResolvedValue({
+        id: 'acc-1',
+        platform: 'TIKTOK',
+        accountName: 'TK',
+      });
+      mockPrismaService.publishJob.findFirst.mockResolvedValue({
+        id: 'job-existing',
+        status: 'QUEUED',
+      });
 
       await expect(
         service.createJob({ videoId: 'v-1', platformAccountId: 'acc-1' }),
@@ -141,8 +161,15 @@ describe('PublishingService', () => {
     });
 
     it('should create publish job and queue in BullMQ when valid', async () => {
-      mockPrismaService.video.findUnique.mockResolvedValue({ id: 'v-1', title: 'Video 1' });
-      mockPrismaService.platformAccount.findUnique.mockResolvedValue({ id: 'acc-1', platform: 'TIKTOK', accountName: 'TK' });
+      mockPrismaService.video.findUnique.mockResolvedValue({
+        id: 'v-1',
+        title: 'Video 1',
+      });
+      mockPrismaService.platformAccount.findUnique.mockResolvedValue({
+        id: 'acc-1',
+        platform: 'TIKTOK',
+        accountName: 'TK',
+      });
       mockPrismaService.publishJob.findFirst.mockResolvedValue(null);
       mockPrismaService.publishJob.create.mockResolvedValue({
         id: 'job-1',
@@ -152,9 +179,16 @@ describe('PublishingService', () => {
         status: 'QUEUED',
       });
 
-      const res = await service.createJob({ videoId: 'v-1', platformAccountId: 'acc-1' });
+      const res = await service.createJob({
+        videoId: 'v-1',
+        platformAccountId: 'acc-1',
+      });
       expect(res.id).toEqual('job-1');
-      expect(mockQueue.add).toHaveBeenCalledWith('publish-video', { jobId: 'job-1' }, expect.any(Object));
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        'publish-video',
+        { jobId: 'job-1' },
+        expect.any(Object),
+      );
     });
   });
 
@@ -168,7 +202,11 @@ describe('PublishingService', () => {
         status: 'QUEUED',
         title: 'Title',
         video: { videoObjectKey: 'v1.mp4', title: 'Video 1' },
-        platformAccount: { id: 'acc-1', platform: 'TIKTOK', accessToken: 'token' },
+        platformAccount: {
+          id: 'acc-1',
+          platform: 'TIKTOK',
+          accessToken: 'token',
+        },
       });
 
       await service.executePublishJob('job-1');
@@ -186,39 +224,60 @@ describe('PublishingService', () => {
   describe('OAuth URL Generation & Validation', () => {
     it('should throw detailed BadRequestException when platform is unconfigured', async () => {
       mockTikTokAdapter.isConfigured.mockReturnValueOnce(false);
-      (mockTikTokAdapter as any).getMissingConfig = jest.fn().mockReturnValue(['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET']);
+      (mockTikTokAdapter as any).getMissingConfig = jest
+        .fn()
+        .mockReturnValue(['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET']);
 
       await expect(
         service.getOAuthUrl('TIKTOK', 'http://localhost:23000/callback'),
-      ).rejects.toThrow('TIKTOK integration is not configured. Missing configuration: TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET');
+      ).rejects.toThrow(
+        'TIKTOK integration is not configured. Missing configuration: TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET',
+      );
     });
 
     it('should return OAuth auth URL when platform is configured', async () => {
       mockTikTokAdapter.isConfigured.mockReturnValueOnce(true);
-      (mockTikTokAdapter as any).getAuthUrl = jest.fn().mockReturnValue({ url: 'https://www.tiktok.com/v2/auth/authorize/...' });
+      (mockTikTokAdapter as any).getAuthUrl = jest.fn().mockReturnValue({
+        url: 'https://www.tiktok.com/v2/auth/authorize/...',
+      });
 
-      const res = await service.getOAuthUrl('TIKTOK', 'http://localhost:23000/callback');
-      expect(res).toEqual({ url: 'https://www.tiktok.com/v2/auth/authorize/...' });
+      const res = await service.getOAuthUrl(
+        'TIKTOK',
+        'http://localhost:23000/callback',
+      );
+      expect(res).toEqual({
+        url: 'https://www.tiktok.com/v2/auth/authorize/...',
+      });
     });
 
     it('should reject handleOAuthCallback if token exchange yields a dummy fallback accountId', async () => {
-      (mockFacebookAdapter as any).handleCallback = jest.fn().mockResolvedValue({
-        accessToken: 'user_token_123',
-        accountId: 'facebook_page',
-        accountName: 'Facebook Page',
-      });
+      (mockFacebookAdapter as any).handleCallback = jest
+        .fn()
+        .mockResolvedValue({
+          accessToken: 'user_token_123',
+          accountId: 'facebook_page',
+          accountName: 'Facebook Page',
+        });
 
       await expect(
-        service.handleOAuthCallback('FACEBOOK', 'valid_code', 'http://localhost:23000/callback'),
-      ).rejects.toThrow('OAuth callback completed, but could not resolve a valid target FACEBOOK account identity.');
+        service.handleOAuthCallback(
+          'FACEBOOK',
+          'valid_code',
+          'http://localhost:23000/callback',
+        ),
+      ).rejects.toThrow(
+        'OAuth callback completed, but could not resolve a valid target FACEBOOK account identity.',
+      );
     });
 
     it('should create account upon valid handleOAuthCallback with real accountId', async () => {
-      (mockFacebookAdapter as any).handleCallback = jest.fn().mockResolvedValue({
-        accessToken: 'page_token_123',
-        accountId: 'real_page_id_999',
-        accountName: 'Official Fanpage',
-      });
+      (mockFacebookAdapter as any).handleCallback = jest
+        .fn()
+        .mockResolvedValue({
+          accessToken: 'page_token_123',
+          accountId: 'real_page_id_999',
+          accountName: 'Official Fanpage',
+        });
       mockPrismaService.platformAccount.create.mockResolvedValue({
         id: 'acc-fb-1',
         platform: 'FACEBOOK',
@@ -227,7 +286,11 @@ describe('PublishingService', () => {
         status: 'ACTIVE',
       });
 
-      const account = await service.handleOAuthCallback('FACEBOOK', 'valid_code', 'http://localhost:23000/callback');
+      const account = await service.handleOAuthCallback(
+        'FACEBOOK',
+        'valid_code',
+        'http://localhost:23000/callback',
+      );
       expect(account.id).toBe('acc-fb-1');
       expect(mockPrismaService.platformAccount.create).toHaveBeenCalledWith(
         expect.objectContaining({

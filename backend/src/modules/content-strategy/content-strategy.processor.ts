@@ -8,9 +8,7 @@ import type { ContentStrategyJobPayload } from './types/content-idea.types';
 export class ContentStrategyProcessor extends WorkerHost {
   private readonly logger = new Logger(ContentStrategyProcessor.name);
 
-  constructor(
-    private readonly contentStrategyService: ContentStrategyService,
-  ) {
+  constructor(private readonly contentStrategyService: ContentStrategyService) {
     super();
   }
 
@@ -29,7 +27,9 @@ export class ContentStrategyProcessor extends WorkerHost {
       return { count: ideas.length, ideas };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error(`[Worker] Content strategy job ${job.id} failed: ${msg}`);
+      this.logger.error(
+        `[Worker] Content strategy job ${job.id} failed: ${msg}`,
+      );
       throw error;
     }
   }

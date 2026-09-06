@@ -77,17 +77,25 @@ export class ProductAnalysisService {
    * Includes safe retries on invalid JSON.
    */
   async analyzeProduct(rawData: RawProductData): Promise<AiProductAnalysis> {
-    this.logger.log(`[AIAnalysis] Starting AI product analysis for "${rawData.title}"`);
+    this.logger.log(
+      `[AIAnalysis] Starting AI product analysis for "${rawData.title}"`,
+    );
 
-    const { provider, apiKey, model } = await this.llmService.getActiveProviderConfig();
+    const { provider, apiKey, model } =
+      await this.llmService.getActiveProviderConfig();
 
     if (!apiKey) {
-      this.logger.warn('[AIAnalysis] No API key configured. Returning raw analysis fallback.');
+      this.logger.warn(
+        '[AIAnalysis] No API key configured. Returning raw analysis fallback.',
+      );
       return this.fallbackFromRaw(rawData);
     }
 
     const productSummaryText = this.buildPromptContext(rawData);
-    const prompt = PRODUCT_ANALYSIS_PROMPT.replace('{PRODUCT_DATA}', productSummaryText);
+    const prompt = PRODUCT_ANALYSIS_PROMPT.replace(
+      '{PRODUCT_DATA}',
+      productSummaryText,
+    );
 
     // Attempt 1
     try {
@@ -103,7 +111,12 @@ export class ProductAnalysisService {
     // Attempt 2 (Retry with strict JSON instruction)
     try {
       const retryPrompt = `${prompt}\n\nSTRICT NOTICE: Previous output was invalid. Reply strictly with raw valid JSON only!`;
-      const responseText = await this.callLlm(provider, apiKey, model, retryPrompt);
+      const responseText = await this.callLlm(
+        provider,
+        apiKey,
+        model,
+        retryPrompt,
+      );
       const parsed = this.parseAndValidateResponse(responseText);
       if (parsed) return parsed;
     } catch (retryErr) {
@@ -112,7 +125,9 @@ export class ProductAnalysisService {
       );
     }
 
-    this.logger.warn('[AIAnalysis] AI response parsing failed after retries. Using raw fallback.');
+    this.logger.warn(
+      '[AIAnalysis] AI response parsing failed after retries. Using raw fallback.',
+    );
     return this.fallbackFromRaw(rawData);
   }
 
@@ -122,10 +137,15 @@ export class ProductAnalysisService {
     if (rawData.title) parts.push(`Tên sản phẩm: ${rawData.title}`);
     if (rawData.brand) parts.push(`Thương hiệu: ${rawData.brand}`);
     if (rawData.category) parts.push(`Danh mục: ${rawData.category}`);
-    if (rawData.price) parts.push(`Giá bán: ${rawData.price} ${rawData.currency || ''}`);
+    if (rawData.price)
+      parts.push(`Giá bán: ${rawData.price} ${rawData.currency || ''}`);
     if (rawData.originalPrice) parts.push(`Giá gốc: ${rawData.originalPrice}`);
-    if (rawData.discountPercent != null) parts.push(`Giảm giá: ${rawData.discountPercent}%`);
-    if (rawData.rating != null) parts.push(`Đánh giá: ${rawData.rating}/5 (${rawData.reviewCount || 0} lượt đánh giá)`);
+    if (rawData.discountPercent != null)
+      parts.push(`Giảm giá: ${rawData.discountPercent}%`);
+    if (rawData.rating != null)
+      parts.push(
+        `Đánh giá: ${rawData.rating}/5 (${rawData.reviewCount || 0} lượt đánh giá)`,
+      );
 
     if (rawData.description) {
       parts.push(`Mô tả chi tiết: ${rawData.description.substring(0, 2500)}`);
@@ -135,7 +155,10 @@ export class ProductAnalysisService {
       parts.push(`Tính năng nổi bật: ${rawData.features.join('; ')}`);
     }
 
-    if (rawData.specifications && Object.keys(rawData.specifications).length > 0) {
+    if (
+      rawData.specifications &&
+      Object.keys(rawData.specifications).length > 0
+    ) {
       const specsStr = Object.entries(rawData.specifications)
         .map(([k, v]) => `${k}: ${v}`)
         .join('; ');
@@ -195,7 +218,9 @@ export class ProductAnalysisService {
         }),
       });
       if (!response.ok) {
-        throw new Error(`Gemini API error ${response.status}: ${await response.text()}`);
+        throw new Error(
+          `Gemini API error ${response.status}: ${await response.text()}`,
+        );
       }
       const data = (await response.json()) as GeminiResponse;
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -218,7 +243,9 @@ export class ProductAnalysisService {
         }),
       });
       if (!response.ok) {
-        throw new Error(`Azure API error ${response.status}: ${await response.text()}`);
+        throw new Error(
+          `Azure API error ${response.status}: ${await response.text()}`,
+        );
       }
       const data = (await response.json()) as OpenAICompatibleResponse;
       return data.choices?.[0]?.message?.content || '';
@@ -243,7 +270,9 @@ export class ProductAnalysisService {
     });
 
     if (!response.ok) {
-      throw new Error(`${provider} API error ${response.status}: ${await response.text()}`);
+      throw new Error(
+        `${provider} API error ${response.status}: ${await response.text()}`,
+      );
     }
     const data = (await response.json()) as OpenAICompatibleResponse;
     return data.choices?.[0]?.message?.content || '';
@@ -257,7 +286,7 @@ export class ProductAnalysisService {
   }
 
   private parseAndValidateResponse(text: string): AiProductAnalysis | null {
-    let cleaned = text
+    const cleaned = text
       .replace(/```json\s*/gi, '')
       .replace(/```\s*/g, '')
       .replace(/<think\b[^>]*>.*?<\/think>/gis, '')
@@ -289,7 +318,9 @@ export class ProductAnalysisService {
 
   private fallbackFromRaw(rawData: RawProductData): AiProductAnalysis {
     return {
-      summary: rawData.description ? rawData.description.substring(0, 300) : rawData.title,
+      summary: rawData.description
+        ? rawData.description.substring(0, 300)
+        : rawData.title,
       category: rawData.category || null,
       features: rawData.features || [],
       benefits: [],
@@ -324,7 +355,7 @@ export class ProductAnalysisService {
         (item) =>
           typeof item === 'object' &&
           item !== null &&
-          typeof (item as any).title === 'string',
+          typeof item.title === 'string',
       )
       .map((item: any) => ({
         title: String(item.title || '').trim(),

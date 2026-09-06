@@ -12,7 +12,10 @@ import { type VideoJobPayload } from './queue.service';
 import { SettingsService } from '../settings/settings.service';
 
 export const cancelledJobs = new Set<string>();
-export const activeProcesses = new Map<string, ChildProcessWithoutNullStreams>();
+export const activeProcesses = new Map<
+  string,
+  ChildProcessWithoutNullStreams
+>();
 
 export function killActiveProcess(jobId: string) {
   const proc = activeProcesses.get(jobId);
@@ -76,7 +79,20 @@ export class VideoProcessor extends WorkerHost {
     const taskStorageDir = path.join(engineDir, 'storage', 'tasks', jobId);
 
     // Fetch product if associated with job or idea
-    const targetProductId = config.productId || (await this.prisma.generationJob.findUnique({ where: { id: jobId }, select: { productId: true, idea: { select: { productId: true } } } }))?.productId || (await this.prisma.generationJob.findUnique({ where: { id: jobId }, select: { idea: { select: { productId: true } } } }))?.idea?.productId;
+    const targetProductId =
+      config.productId ||
+      (
+        await this.prisma.generationJob.findUnique({
+          where: { id: jobId },
+          select: { productId: true, idea: { select: { productId: true } } },
+        })
+      )?.productId ||
+      (
+        await this.prisma.generationJob.findUnique({
+          where: { id: jobId },
+          select: { idea: { select: { productId: true } } },
+        })
+      )?.idea?.productId;
 
     let productDataJson: string | null = null;
     if (targetProductId) {
@@ -118,7 +134,8 @@ export class VideoProcessor extends WorkerHost {
     if (language) {
       args.push('--video-language', language);
     }
-    const settings: Record<string, any> = await this.settingsService.getSettings();
+    const settings: Record<string, any> =
+      await this.settingsService.getSettings();
     const effectiveVoiceName =
       config.voice_name && config.voice_name.trim()
         ? config.voice_name
@@ -156,7 +173,9 @@ export class VideoProcessor extends WorkerHost {
     }
 
     const effectiveFontName =
-      config.font_name || settings.subtitle_font_name || 'BeVietnamPro-Bold.ttf';
+      config.font_name ||
+      settings.subtitle_font_name ||
+      'BeVietnamPro-Bold.ttf';
     args.push('--font-name', effectiveFontName);
 
     if (config.subtitle_position || settings.subtitle_position) {
@@ -175,36 +194,39 @@ export class VideoProcessor extends WorkerHost {
       args.push('--stroke-width', config.stroke_width.toString());
     }
 
-function getPythonRunner(projectRoot: string, cliArgs: string[]) {
-  try {
-    const { execSync } = require('child_process');
-    execSync('uv --version', { stdio: 'ignore' });
-    return {
-      cmd: 'uv',
-      args: ['run', '--project', 'engine', 'python', ...cliArgs],
-    };
-  } catch {
-    const venvPython = path.join(projectRoot, 'engine', '.venv', 'bin', 'python');
-    if (fs.existsSync(venvPython)) {
-      return {
-        cmd: venvPython,
-        args: cliArgs,
-      };
+    function getPythonRunner(projectRoot: string, cliArgs: string[]) {
+      try {
+        const { execSync } = require('child_process');
+        execSync('uv --version', { stdio: 'ignore' });
+        return {
+          cmd: 'uv',
+          args: ['run', '--project', 'engine', 'python', ...cliArgs],
+        };
+      } catch {
+        const venvPython = path.join(
+          projectRoot,
+          'engine',
+          '.venv',
+          'bin',
+          'python',
+        );
+        if (fs.existsSync(venvPython)) {
+          return {
+            cmd: venvPython,
+            args: cliArgs,
+          };
+        }
+        return {
+          cmd: 'python3',
+          args: cliArgs,
+        };
+      }
     }
-    return {
-      cmd: 'python3',
-      args: cliArgs,
-    };
-  }
-}
 
     const runner = getPythonRunner(projectRoot, args);
-    this.logger.log(
-      `Executing engine: ${runner.cmd} ${runner.args.join(' ')}`,
-    );
+    this.logger.log(`Executing engine: ${runner.cmd} ${runner.args.join(' ')}`);
 
     return new Promise((resolve, reject) => {
-
       let pyProcess: ChildProcessWithoutNullStreams | null = null;
       let logQueue: Promise<void> = Promise.resolve();
       let settled = false;
@@ -320,14 +342,10 @@ function getPythonRunner(projectRoot: string, cliArgs: string[]) {
         }
       };
 
-      pyProcess = spawn(
-        runner.cmd,
-        runner.args,
-        {
-          cwd: projectRoot,
-          env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
-        },
-      );
+      pyProcess = spawn(runner.cmd, runner.args, {
+        cwd: projectRoot,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      });
       activeProcesses.set(jobId, pyProcess);
 
       pyProcess.on('close', () => {
@@ -377,7 +395,13 @@ function getPythonRunner(projectRoot: string, cliArgs: string[]) {
           this.logger.log(`Engine CLI completed with code: ${code}`);
 
           if (code !== 0) {
-            const errMsg = `CLI execution failed with exit code ${code}`;
+            const lastErrorLog = await this.prisma.jobLog.findFirst({
+              where: { jobId, level: { in: ['error', 'warn'] } },
+              orderBy: { createdAt: 'desc' },
+            });
+            const errMsg = lastErrorLog
+              ? `${lastErrorLog.message} (Lỗi mã exit ${code})`
+              : `CLI execution failed with exit code ${code}`;
             await this.prisma.generationJob.update({
               where: { id: jobId },
               data: {

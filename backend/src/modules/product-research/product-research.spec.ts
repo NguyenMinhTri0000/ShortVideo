@@ -2,7 +2,10 @@ import { GenericProductAdapter } from './adapters/generic-product.adapter';
 import { ShopeeAdapter } from './adapters/shopee.adapter';
 import { AmazonAdapter } from './adapters/amazon.adapter';
 import { ContentBriefService } from './content-brief.service';
-import type { RawProductData, AiProductAnalysis } from './types/product-research.types';
+import type {
+  RawProductData,
+  AiProductAnalysis,
+} from './types/product-research.types';
 
 describe('Product Research Engine Tests', () => {
   describe('ProductSourceAdapters', () => {
@@ -11,23 +14,33 @@ describe('Product Research Engine Tests', () => {
     const amazonAdapter = new AmazonAdapter();
 
     it('should correctly identify handled URLs per adapter', () => {
-      expect(shopeeAdapter.canHandle('https://shopee.vn/product/123/456')).toBe(true);
-      expect(shopeeAdapter.canHandle('https://example.com/product')).toBe(false);
+      expect(shopeeAdapter.canHandle('https://shopee.vn/product/123/456')).toBe(
+        true,
+      );
+      expect(shopeeAdapter.canHandle('https://example.com/product')).toBe(
+        false,
+      );
 
-      expect(amazonAdapter.canHandle('https://www.amazon.com/dp/B08N5WRWNW')).toBe(true);
-      expect(amazonAdapter.canHandle('https://example.com/product')).toBe(false);
+      expect(
+        amazonAdapter.canHandle('https://www.amazon.com/dp/B08N5WRWNW'),
+      ).toBe(true);
+      expect(amazonAdapter.canHandle('https://example.com/product')).toBe(
+        false,
+      );
 
-      expect(genericAdapter.canHandle('https://example.com/product')).toBe(true);
+      expect(genericAdapter.canHandle('https://example.com/product')).toBe(
+        true,
+      );
     });
 
     it('should reject invalid or unsafe SSRF URLs', async () => {
       await expect(genericAdapter.extract('invalid-url')).rejects.toThrow();
-      await expect(genericAdapter.extract('http://127.0.0.1/admin')).rejects.toThrow(
-        'Không thể truy cập địa chỉ nội bộ',
-      );
-      await expect(genericAdapter.extract('http://169.254.169.254/metadata')).rejects.toThrow(
-        'Không thể truy cập địa chỉ nội bộ',
-      );
+      await expect(
+        genericAdapter.extract('http://127.0.0.1/admin'),
+      ).rejects.toThrow('Không thể truy cập địa chỉ nội bộ');
+      await expect(
+        genericAdapter.extract('http://169.254.169.254/metadata'),
+      ).rejects.toThrow('Không thể truy cập địa chỉ nội bộ');
     });
   });
 
@@ -55,7 +68,8 @@ describe('Product Research Engine Tests', () => {
       };
 
       const aiAnalysis: AiProductAnalysis = {
-        summary: 'Nồi chiên không dầu cao cấp Philips giúp nấu ăn lành mạnh giảm 90% lượng dầu mỡ.',
+        summary:
+          'Nồi chiên không dầu cao cấp Philips giúp nấu ăn lành mạnh giảm 90% lượng dầu mỡ.',
         category: 'Gia dụng nhà bếp',
         features: ['Công nghệ Rapid Air', 'Màn hình cảm ứng'],
         benefits: ['Nấu ăn nhanh', 'Giảm lượng dầu mỡ'],

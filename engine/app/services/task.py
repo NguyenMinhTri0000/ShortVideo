@@ -343,10 +343,29 @@ def get_video_materials(task_id, params, video_terms, audio_duration):
             max_clip_duration=params.video_clip_duration,
             match_script_order=params.match_materials_to_script,
         )
+
         if not downloaded_videos and not product_clips:
-            sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
+            # Fallback: try search B-roll using video_terms or subject
+            logger.warning("Product visuals download empty, attempting fallback B-roll search...")
+            search_terms = video_terms if video_terms else [params.video_subject or "product"]
+            downloaded_videos = material.download_videos(
+                task_id=task_id,
+                search_terms=search_terms,
+                source=params.video_source if params.video_source != "local" else "pexels",
+                video_aspect=params.video_aspect,
+                audio_duration=audio_duration * params.video_count,
+                max_clip_duration=params.video_clip_duration,
+            )
+
+        if not downloaded_videos and not product_clips:
+            sm.state.update_task(
+                task_id,
+                state=const.TASK_STATE_FAILED,
+                error_msg="Không tải được tư liệu video/ảnh (Shopee 404 / Không tìm thấy tư liệu)",
+                error_step="materials",
+            )
             logger.error(
-                "failed to download videos, maybe the network is not available."
+                "failed to download videos or product materials."
             )
             return None
 
@@ -426,7 +445,12 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
     # 1. Generate script
     video_script = generate_script(task_id, params)
     if not video_script or "Error: " in video_script:
-        sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
+        sm.state.update_task(
+            task_id,
+            state=const.TASK_STATE_FAILED,
+            error_msg="Lỗi tạo kịch bản (Generate script failed)",
+            error_step="script",
+        )
         return
 
     sm.state.update_task(task_id, state=const.TASK_STATE_PROCESSING, progress=10)
@@ -443,7 +467,12 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
     if params.video_source != "local":
         video_terms = generate_terms(task_id, params, video_script)
         if not video_terms:
-            sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
+            sm.state.update_task(
+                task_id,
+                state=const.TASK_STATE_FAILED,
+                error_msg="Lỗi trích xuất từ khóa tìm kiếm (Generate search terms failed)",
+                error_step="terms",
+            )
             return
 
     save_script_data(task_id, video_script, video_terms, params)
@@ -461,7 +490,12 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
         task_id, params, video_script
     )
     if not audio_file:
-        sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
+        sm.state.update_task(
+            task_id,
+            state=const.TASK_STATE_FAILED,
+            error_msg="Lỗi tạo giọng đọc TTS / Audio (Audio generation failed)",
+            error_step="audio",
+        )
         return
 
     sm.state.update_task(task_id, state=const.TASK_STATE_PROCESSING, progress=30)
@@ -496,7 +530,12 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
         task_id, params, video_terms, audio_duration
     )
     if not downloaded_videos:
-        sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
+        sm.state.update_task(
+            task_id,
+            state=const.TASK_STATE_FAILED,
+            error_msg="Lỗi tải tư liệu video/ảnh (Get materials failed)",
+            error_step="materials",
+        )
         return
 
     if stop_at == "materials":
@@ -521,7 +560,12 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
     )
 
     if not final_video_paths:
-        sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
+        sm.state.update_task(
+            task_id,
+            state=const.TASK_STATE_FAILED,
+            error_msg="Lỗi ghép nối và render video hoàn chỉnh (Render video failed)",
+            error_step="rendering",
+        )
         return
 
     logger.success(

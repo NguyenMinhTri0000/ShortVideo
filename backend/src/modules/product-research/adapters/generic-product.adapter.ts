@@ -15,10 +15,22 @@ const BLOCKED_HOSTS = [
 
 const BLOCKED_IP_PREFIXES = [
   '10.',
-  '172.16.', '172.17.', '172.18.', '172.19.',
-  '172.20.', '172.21.', '172.22.', '172.23.',
-  '172.24.', '172.25.', '172.26.', '172.27.',
-  '172.28.', '172.29.', '172.30.', '172.31.',
+  '172.16.',
+  '172.17.',
+  '172.18.',
+  '172.19.',
+  '172.20.',
+  '172.21.',
+  '172.22.',
+  '172.23.',
+  '172.24.',
+  '172.25.',
+  '172.26.',
+  '172.27.',
+  '172.28.',
+  '172.29.',
+  '172.30.',
+  '172.31.',
   '192.168.',
   '0.',
 ];
@@ -66,15 +78,31 @@ export class GenericProductAdapter extends ProductSourceAdapter {
     const domData = this.extractDomData($, url);
 
     // Normalize & merge data in priority order
-    const title = jsonLd.name || og.title || meta.title || domData.title || null;
-    const brand = jsonLd.brand || og.brand || meta.brand || domData.brand || null;
-    const category = jsonLd.category || og.category || meta.category || domData.category || null;
+    const title =
+      jsonLd.name || og.title || meta.title || domData.title || null;
+    const brand =
+      jsonLd.brand || og.brand || meta.brand || domData.brand || null;
+    const category =
+      jsonLd.category ||
+      og.category ||
+      meta.category ||
+      domData.category ||
+      null;
     const description =
-      jsonLd.description || og.description || meta.description || domData.description || null;
+      jsonLd.description ||
+      og.description ||
+      meta.description ||
+      domData.description ||
+      null;
 
     const priceData = this.mergePrices(jsonLd, og, meta, domData);
     const ratingData = this.mergeRatings(jsonLd, meta, domData);
-    const images = this.mergeImages(jsonLd.images, og.image, meta.images, domData.images);
+    const images = this.mergeImages(
+      jsonLd.images,
+      og.image,
+      meta.images,
+      domData.images,
+    );
     const videos = this.mergeVideos(jsonLd.videos, og.video, domData.videos);
     const features = Array.from(
       new Set([...jsonLd.features, ...meta.features, ...domData.features]),
@@ -159,12 +187,19 @@ export class GenericProductAdapter extends ProductSourceAdapter {
       this.logger.log(`[Fetch] HTTP ${response.status} for ${url}`);
 
       if (!response.ok) {
-        throw new Error(`Không thể tải trang sản phẩm (HTTP ${response.status})`);
+        throw new Error(
+          `Không thể tải trang sản phẩm (HTTP ${response.status})`,
+        );
       }
 
       const contentType = response.headers.get('content-type') || '';
-      if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
-        throw new Error(`URL không trỏ đến trang HTML (content-type: ${contentType})`);
+      if (
+        !contentType.includes('text/html') &&
+        !contentType.includes('application/xhtml')
+      ) {
+        throw new Error(
+          `URL không trỏ đến trang HTML (content-type: ${contentType})`,
+        );
       }
 
       const arrayBuffer = await response.arrayBuffer();
@@ -177,7 +212,9 @@ export class GenericProductAdapter extends ProductSourceAdapter {
     } catch (error: unknown) {
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          throw new Error('Hết thời gian chờ khi tải trang sản phẩm (timeout 12s)');
+          throw new Error(
+            'Hết thời gian chờ khi tải trang sản phẩm (timeout 12s)',
+          );
         }
         throw error;
       }
@@ -218,7 +255,9 @@ export class GenericProductAdapter extends ProductSourceAdapter {
           const items = Array.isArray(data) ? data : [data];
 
           for (const item of items) {
-            const candidates = item['@graph'] ? [...item['@graph'], item] : [item];
+            const candidates = item['@graph']
+              ? [...item['@graph'], item]
+              : [item];
 
             for (const candidate of candidates) {
               const type = (candidate['@type'] || '').toString().toLowerCase();
@@ -230,7 +269,8 @@ export class GenericProductAdapter extends ProductSourceAdapter {
                 continue;
               }
 
-              if (!result.name && candidate.name) result.name = String(candidate.name).trim();
+              if (!result.name && candidate.name)
+                result.name = String(candidate.name).trim();
               if (!result.brand && candidate.brand) {
                 result.brand =
                   typeof candidate.brand === 'string'
@@ -250,7 +290,8 @@ export class GenericProductAdapter extends ProductSourceAdapter {
                   ? candidate.image
                   : [candidate.image];
                 for (const img of imgList) {
-                  const url = typeof img === 'string' ? img : img?.url || img?.contentUrl;
+                  const url =
+                    typeof img === 'string' ? img : img?.url || img?.contentUrl;
                   if (url) result.images.push(String(url));
                 }
               }
@@ -261,7 +302,10 @@ export class GenericProductAdapter extends ProductSourceAdapter {
                   ? candidate.video
                   : [candidate.video];
                 for (const vid of vidList) {
-                  const url = typeof vid === 'string' ? vid : vid?.contentUrl || vid?.embedUrl;
+                  const url =
+                    typeof vid === 'string'
+                      ? vid
+                      : vid?.contentUrl || vid?.embedUrl;
                   if (url) result.videos.push(String(url));
                 }
               }
@@ -274,7 +318,8 @@ export class GenericProductAdapter extends ProductSourceAdapter {
                 for (const offer of offers) {
                   if (offer.price != null) {
                     result.price = String(offer.price);
-                    if (offer.priceCurrency) result.currency = String(offer.priceCurrency);
+                    if (offer.priceCurrency)
+                      result.currency = String(offer.priceCurrency);
                   }
                   if (offer.highPrice != null && !result.originalPrice) {
                     result.originalPrice = String(offer.highPrice);
@@ -285,9 +330,12 @@ export class GenericProductAdapter extends ProductSourceAdapter {
               // AggregateRating
               if (candidate.aggregateRating) {
                 const r = candidate.aggregateRating;
-                if (r.ratingValue != null) result.rating = parseFloat(String(r.ratingValue));
-                if (r.reviewCount != null) result.reviewCount = parseInt(String(r.reviewCount), 10);
-                else if (r.ratingCount != null) result.reviewCount = parseInt(String(r.ratingCount), 10);
+                if (r.ratingValue != null)
+                  result.rating = parseFloat(String(r.ratingValue));
+                if (r.reviewCount != null)
+                  result.reviewCount = parseInt(String(r.reviewCount), 10);
+                else if (r.ratingCount != null)
+                  result.reviewCount = parseInt(String(r.ratingCount), 10);
               }
 
               // Specifications
@@ -297,7 +345,9 @@ export class GenericProductAdapter extends ProductSourceAdapter {
                   : [candidate.additionalProperty];
                 for (const prop of props) {
                   if (prop.name && prop.value) {
-                    result.specifications[String(prop.name)] = String(prop.value);
+                    result.specifications[String(prop.name)] = String(
+                      prop.value,
+                    );
                     result.features.push(`${prop.name}: ${prop.value}`);
                   }
                 }
@@ -330,13 +380,20 @@ export class GenericProductAdapter extends ProductSourceAdapter {
 
     return {
       title: $('meta[property="og:title"]').attr('content')?.trim() || null,
-      brand: $('meta[property="product:brand"]').attr('content')?.trim() || null,
-      category: $('meta[property="product:category"]').attr('content')?.trim() || null,
-      description: $('meta[property="og:description"]').attr('content')?.trim() || null,
+      brand:
+        $('meta[property="product:brand"]').attr('content')?.trim() || null,
+      category:
+        $('meta[property="product:category"]').attr('content')?.trim() || null,
+      description:
+        $('meta[property="og:description"]').attr('content')?.trim() || null,
       image: ogImages,
       video: $('meta[property="og:video"]').attr('content')?.trim() || null,
-      price: $('meta[property="product:price:amount"]').attr('content')?.trim() || null,
-      currency: $('meta[property="product:price:currency"]').attr('content')?.trim() || null,
+      price:
+        $('meta[property="product:price:amount"]').attr('content')?.trim() ||
+        null,
+      currency:
+        $('meta[property="product:price:currency"]').attr('content')?.trim() ||
+        null,
     };
   }
 
@@ -346,7 +403,8 @@ export class GenericProductAdapter extends ProductSourceAdapter {
 
   private extractHtmlMeta($: cheerio.CheerioAPI) {
     const title = $('title').first().text()?.trim() || null;
-    const description = $('meta[name="description"]').attr('content')?.trim() || null;
+    const description =
+      $('meta[name="description"]').attr('content')?.trim() || null;
     const brand = $('meta[name="brand"]').attr('content')?.trim() || null;
     const category = $('meta[name="category"]').attr('content')?.trim() || null;
 
@@ -354,15 +412,20 @@ export class GenericProductAdapter extends ProductSourceAdapter {
     $(
       'img[src*="product"], img[src*="item"], img[src*="gallery"], img[data-src*="product"], img[data-src*="item"]',
     ).each((_, el) => {
-      const src = $(el).attr('src') || $(el).attr('data-src') || $(el).attr('data-lazy-src');
+      const src =
+        $(el).attr('src') ||
+        $(el).attr('data-src') ||
+        $(el).attr('data-lazy-src');
       if (src) images.push(src);
     });
 
     const features: string[] = [];
-    $('.product-features li, .key-features li, .features-list li').each((_, el) => {
-      const txt = $(el).text().trim();
-      if (txt) features.push(txt);
-    });
+    $('.product-features li, .key-features li, .features-list li').each(
+      (_, el) => {
+        const txt = $(el).text().trim();
+        if (txt) features.push(txt);
+      },
+    );
 
     return { title, description, brand, category, images, features };
   }
@@ -373,8 +436,10 @@ export class GenericProductAdapter extends ProductSourceAdapter {
 
   private extractDomData($: cheerio.CheerioAPI, baseUrl?: string) {
     const title =
-      $('h1.product-title, h1.product-name, h1[itemprop="name"], h1').first().text()?.trim() ||
-      null;
+      $('h1.product-title, h1.product-name, h1[itemprop="name"], h1')
+        .first()
+        .text()
+        ?.trim() || null;
 
     const description =
       $('.product-description, #product-description, [itemprop="description"]')
@@ -383,7 +448,10 @@ export class GenericProductAdapter extends ProductSourceAdapter {
         ?.trim() || null;
 
     const brand =
-      $('[itemprop="brand"], .product-brand, .brand-name').first().text()?.trim() || null;
+      $('[itemprop="brand"], .product-brand, .brand-name')
+        .first()
+        .text()
+        ?.trim() || null;
 
     const category =
       $('.breadcrumb span, .breadcrumbs a').last().text()?.trim() || null;
@@ -410,7 +478,9 @@ export class GenericProductAdapter extends ProductSourceAdapter {
     let rating: number | null = null;
     let reviewCount: number | null = null;
 
-    const ratingText = $('[itemprop="ratingValue"], .rating-score, .star-rating')
+    const ratingText = $(
+      '[itemprop="ratingValue"], .rating-score, .star-rating',
+    )
       .first()
       .text()
       ?.trim();
@@ -419,7 +489,9 @@ export class GenericProductAdapter extends ProductSourceAdapter {
       if (!isNaN(num)) rating = num;
     }
 
-    const reviewCountText = $('[itemprop="reviewCount"], .review-count, .total-reviews')
+    const reviewCountText = $(
+      '[itemprop="reviewCount"], .review-count, .total-reviews',
+    )
       .first()
       .text()
       ?.trim();
@@ -432,14 +504,16 @@ export class GenericProductAdapter extends ProductSourceAdapter {
     const specifications: Record<string, string> = {};
     const features: string[] = [];
 
-    $('table.specifications tr, table.product-spec tr, .spec-item').each((_, el) => {
-      const key = $(el).find('td:nth-child(1), .spec-title').text().trim();
-      const val = $(el).find('td:nth-child(2), .spec-value').text().trim();
-      if (key && val) {
-        specifications[key] = val;
-        features.push(`${key}: ${val}`);
-      }
-    });
+    $('table.specifications tr, table.product-spec tr, .spec-item').each(
+      (_, el) => {
+        const key = $(el).find('td:nth-child(1), .spec-title').text().trim();
+        const val = $(el).find('td:nth-child(2), .spec-value').text().trim();
+        if (key && val) {
+          specifications[key] = val;
+          features.push(`${key}: ${val}`);
+        }
+      },
+    );
 
     const rawCandidateUrls: string[] = [];
 
@@ -498,7 +572,9 @@ export class GenericProductAdapter extends ProductSourceAdapter {
       if (!scriptText || scriptText.length > 500000) return;
 
       // Standard image extension matches
-      const stdMatches = scriptText.match(/https?:\/\/[^"'\s\\]+?\.(?:jpg|jpeg|png|webp)/gi);
+      const stdMatches = scriptText.match(
+        /https?:\/\/[^"'\s\\]+?\.(?:jpg|jpeg|png|webp)/gi,
+      );
       if (stdMatches) {
         for (const m of stdMatches) {
           rawCandidateUrls.push(m);
@@ -525,13 +601,15 @@ export class GenericProductAdapter extends ProductSourceAdapter {
 
     // Videos
     const videos: string[] = [];
-    $('video source, video, iframe[src*="youtube"], iframe[src*="vimeo"]').each((_, el) => {
-      const src = $(el).attr('src');
-      if (src) {
-        const resolvedVid = this.resolveUrl(src, baseUrl);
-        if (resolvedVid) videos.push(resolvedVid);
-      }
-    });
+    $('video source, video, iframe[src*="youtube"], iframe[src*="vimeo"]').each(
+      (_, el) => {
+        const src = $(el).attr('src');
+        if (src) {
+          const resolvedVid = this.resolveUrl(src, baseUrl);
+          if (resolvedVid) videos.push(resolvedVid);
+        }
+      },
+    );
 
     return {
       title,
@@ -549,14 +627,21 @@ export class GenericProductAdapter extends ProductSourceAdapter {
     };
   }
 
-  private resolveAndUpgradeImageUrl(raw: string, baseUrl?: string): string | null {
+  private resolveAndUpgradeImageUrl(
+    raw: string,
+    baseUrl?: string,
+  ): string | null {
     if (!raw || typeof raw !== 'string') return null;
     let urlStr = raw.trim();
     if (urlStr.startsWith('//')) urlStr = 'https:' + urlStr;
 
     let absolute: string;
     try {
-      if (baseUrl && !urlStr.startsWith('http://') && !urlStr.startsWith('https://')) {
+      if (
+        baseUrl &&
+        !urlStr.startsWith('http://') &&
+        !urlStr.startsWith('https://')
+      ) {
         absolute = new URL(urlStr, baseUrl).href;
       } else {
         absolute = new URL(urlStr).href;
@@ -566,7 +651,11 @@ export class GenericProductAdapter extends ProductSourceAdapter {
     }
 
     const lower = absolute.toLowerCase();
-    if (lower.includes('data:image/') || lower.includes('.svg') || lower.endsWith('.gif')) {
+    if (
+      lower.includes('data:image/') ||
+      lower.includes('.svg') ||
+      lower.endsWith('.gif')
+    ) {
       return null;
     }
     if (
@@ -592,7 +681,10 @@ export class GenericProductAdapter extends ProductSourceAdapter {
     // Lazada thumbnails (_80x80q80.jpg)
     absolute = absolute.replace(/_\d+x\d+q\d+\.[a-z]+$/i, '');
     // Amazon thumbnails (._AC_US40_, etc.)
-    absolute = absolute.replace(/\._[A-Z0-9_]+_(\.[a-z]+)?$/i, (_, g1) => g1 || '');
+    absolute = absolute.replace(
+      /\._[A-Z0-9_]+_(\.[a-z]+)?$/i,
+      (_, g1) => g1 || '',
+    );
 
     return absolute;
   }
@@ -602,7 +694,9 @@ export class GenericProductAdapter extends ProductSourceAdapter {
     let u = raw.trim();
     if (u.startsWith('//')) u = 'https:' + u;
     try {
-      return baseUrl && !u.startsWith('http') ? new URL(u, baseUrl).href : new URL(u).href;
+      return baseUrl && !u.startsWith('http')
+        ? new URL(u, baseUrl).href
+        : new URL(u).href;
     } catch {
       return null;
     }
@@ -639,7 +733,9 @@ export class GenericProductAdapter extends ProductSourceAdapter {
 
     return {
       price: rawPrice ? this.cleanPriceString(rawPrice) : null,
-      originalPrice: rawOriginalPrice ? this.cleanPriceString(rawOriginalPrice) : null,
+      originalPrice: rawOriginalPrice
+        ? this.cleanPriceString(rawOriginalPrice)
+        : null,
       currency,
       discountPercent,
     };
@@ -652,7 +748,9 @@ export class GenericProductAdapter extends ProductSourceAdapter {
     };
   }
 
-  private mergeImages(...lists: (string | string[] | null | undefined)[]): string[] {
+  private mergeImages(
+    ...lists: (string | string[] | null | undefined)[]
+  ): string[] {
     const seen = new Set<string>();
     const result: string[] = [];
 
@@ -672,7 +770,9 @@ export class GenericProductAdapter extends ProductSourceAdapter {
     return result.slice(0, 30);
   }
 
-  private mergeVideos(...lists: (string | string[] | null | undefined)[]): string[] {
+  private mergeVideos(
+    ...lists: (string | string[] | null | undefined)[]
+  ): string[] {
     const seen = new Set<string>();
     const result: string[] = [];
 

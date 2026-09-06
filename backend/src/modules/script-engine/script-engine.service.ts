@@ -125,8 +125,12 @@ export class ScriptEngineService {
   /**
    * Generates a VideoScript from a ContentIdea
    */
-  async generateScriptFromIdea(contentIdeaId: string): Promise<VideoScriptResponse> {
-    this.logger.log(`[ScriptEngine] Generating script for contentIdeaId=${contentIdeaId}`);
+  async generateScriptFromIdea(
+    contentIdeaId: string,
+  ): Promise<VideoScriptResponse> {
+    this.logger.log(
+      `[ScriptEngine] Generating script for contentIdeaId=${contentIdeaId}`,
+    );
 
     const contentIdea = await this.prisma.contentIdea.findUnique({
       where: { id: contentIdeaId },
@@ -138,14 +142,17 @@ export class ScriptEngineService {
     }
 
     const product = contentIdea.product;
-    const { provider, apiKey, model } = await this.llmService.getActiveProviderConfig();
+    const { provider, apiKey, model } =
+      await this.llmService.getActiveProviderConfig();
 
     let rawOutput: RawScriptLlmOutput | null = null;
 
     if (apiKey) {
       const researchData = this.buildResearchContext(product);
-      const prompt = SCRIPT_ENGINE_PROMPT
-        .replace(/{IDEA_TITLE}/g, contentIdea.title)
+      const prompt = SCRIPT_ENGINE_PROMPT.replace(
+        /{IDEA_TITLE}/g,
+        contentIdea.title,
+      )
         .replace(/{IDEA_CONTENT_TYPE}/g, contentIdea.contentType)
         .replace(/{IDEA_MARKETING_ANGLE}/g, contentIdea.marketingAngle)
         .replace(/{IDEA_TARGET_AUDIENCE}/g, contentIdea.targetAudience)
@@ -157,7 +164,12 @@ export class ScriptEngineService {
         .replace('{PRODUCT_RESEARCH_DATA}', researchData);
 
       try {
-        const responseText = await this.callLlm(provider, apiKey, model, prompt);
+        const responseText = await this.callLlm(
+          provider,
+          apiKey,
+          model,
+          prompt,
+        );
         rawOutput = this.parseAndValidateLlmOutput(responseText);
       } catch (err) {
         this.logger.warn(
@@ -165,7 +177,9 @@ export class ScriptEngineService {
         );
       }
     } else {
-      this.logger.warn('[ScriptEngine] No LLM API key configured. Using rule-based fallback.');
+      this.logger.warn(
+        '[ScriptEngine] No LLM API key configured. Using rule-based fallback.',
+      );
     }
 
     if (!rawOutput) {
@@ -173,8 +187,14 @@ export class ScriptEngineService {
     }
 
     // Process & normalize scenes and timings
-    const normalizedScenes = this.normalizeAndValidateTiming(rawOutput.scenes, contentIdea);
-    const totalDuration = normalizedScenes.reduce((sum, s) => sum + s.duration, 0);
+    const normalizedScenes = this.normalizeAndValidateTiming(
+      rawOutput.scenes,
+      contentIdea,
+    );
+    const totalDuration = normalizedScenes.reduce(
+      (sum, s) => sum + s.duration,
+      0,
+    );
 
     const title = rawOutput.title?.trim() || contentIdea.title;
     const hook = rawOutput.hook?.trim() || contentIdea.hook;
@@ -201,12 +221,16 @@ export class ScriptEngineService {
       data: { status: 'generated' },
     });
 
-    this.logger.log(`[ScriptEngine] Successfully generated VideoScript id=${savedScript.id}`);
+    this.logger.log(
+      `[ScriptEngine] Successfully generated VideoScript id=${savedScript.id}`,
+    );
 
     return this.mapToResponse(savedScript);
   }
 
-  async getScriptsByContentIdea(contentIdeaId: string): Promise<VideoScriptResponse[]> {
+  async getScriptsByContentIdea(
+    contentIdeaId: string,
+  ): Promise<VideoScriptResponse[]> {
     const scripts = await this.prisma.videoScript.findMany({
       where: { contentIdeaId },
       orderBy: { createdAt: 'desc' },
@@ -247,7 +271,11 @@ export class ScriptEngineService {
 
     // Adapter: convert structured scenes into plain text narration
     const scenes = (script.scenes as unknown as ScriptScene[]) || [];
-    const legacyScriptText = this.videoScriptToLegacyText(scenes, script.hook, script.cta);
+    const legacyScriptText = this.videoScriptToLegacyText(
+      scenes,
+      script.hook,
+      script.cta,
+    );
 
     // Create Idea entity for full backward compatibility
     const idea = await this.prisma.idea.create({
@@ -298,7 +326,11 @@ export class ScriptEngineService {
   /**
    * Converts array of scenes into plain narration string for legacy renderer
    */
-  videoScriptToLegacyText(scenes: ScriptScene[], hook?: string, cta?: string): string {
+  videoScriptToLegacyText(
+    scenes: ScriptScene[],
+    hook?: string,
+    cta?: string,
+  ): string {
     if (!scenes || scenes.length === 0) {
       return [hook, cta].filter(Boolean).join('\n\n');
     }
@@ -323,15 +355,20 @@ export class ScriptEngineService {
       const raw = rawScenes[i];
       const sceneNumber = i + 1;
 
-      const narration = typeof raw.narration === 'string' && raw.narration.trim()
-        ? raw.narration.trim()
-        : `Cảnh ${sceneNumber}`;
+      const narration =
+        typeof raw.narration === 'string' && raw.narration.trim()
+          ? raw.narration.trim()
+          : `Cảnh ${sceneNumber}`;
 
       // Calculate reasonable duration based on word count (approx 3 words per sec, min 2s)
       const wordCount = narration.split(/\s+/).length;
       let calculatedDuration = Math.max(3, Math.round(wordCount / 2.8));
 
-      if (raw.duration && typeof raw.duration === 'number' && raw.duration >= 1) {
+      if (
+        raw.duration &&
+        typeof raw.duration === 'number' &&
+        raw.duration >= 1
+      ) {
         calculatedDuration = Math.round(raw.duration);
       }
 
@@ -339,13 +376,15 @@ export class ScriptEngineService {
       const endTime = startTime + calculatedDuration;
       currentStartTime = endTime;
 
-      const onScreenText = typeof raw.onScreenText === 'string' && raw.onScreenText.trim()
-        ? raw.onScreenText.trim()
-        : this.deriveOnScreenText(narration);
+      const onScreenText =
+        typeof raw.onScreenText === 'string' && raw.onScreenText.trim()
+          ? raw.onScreenText.trim()
+          : this.deriveOnScreenText(narration);
 
-      const visualDirection = typeof raw.visualDirection === 'string' && raw.visualDirection.trim()
-        ? raw.visualDirection.trim()
-        : `Visual direction for scene ${sceneNumber}`;
+      const visualDirection =
+        typeof raw.visualDirection === 'string' && raw.visualDirection.trim()
+          ? raw.visualDirection.trim()
+          : `Visual direction for scene ${sceneNumber}`;
 
       const mediaType = this.normalizeMediaType(raw.mediaType, i);
 
@@ -401,7 +440,9 @@ Nhược điểm: ${product.cons?.join('; ') || 'N/A'}
         }),
       });
       if (!response.ok) {
-        throw new Error(`Gemini API error ${response.status}: ${await response.text()}`);
+        throw new Error(
+          `Gemini API error ${response.status}: ${await response.text()}`,
+        );
       }
       const data = await response.json();
       return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -412,7 +453,8 @@ Nhược điểm: ${product.cons?.join('; ') || 'N/A'}
       openai: 'https://api.openai.com/v1/chat/completions',
       deepseek: 'https://api.deepseek.com/v1/chat/completions',
     };
-    const url = openAiUrls[provider] || 'https://api.openai.com/v1/chat/completions';
+    const url =
+      openAiUrls[provider] || 'https://api.openai.com/v1/chat/completions';
 
     const response = await fetch(url, {
       method: 'POST',
@@ -428,17 +470,24 @@ Nhược điểm: ${product.cons?.join('; ') || 'N/A'}
     });
 
     if (!response.ok) {
-      throw new Error(`${provider} API error ${response.status}: ${await response.text()}`);
+      throw new Error(
+        `${provider} API error ${response.status}: ${await response.text()}`,
+      );
     }
     const data = await response.json();
     return data.choices?.[0]?.message?.content || '';
   }
 
-  private parseAndValidateLlmOutput(rawText: string): RawScriptLlmOutput | null {
+  private parseAndValidateLlmOutput(
+    rawText: string,
+  ): RawScriptLlmOutput | null {
     if (!rawText || !rawText.trim()) return null;
 
     let cleaned = rawText.trim();
-    cleaned = cleaned.replace(/```json/g, '').replace(/```/g, '').trim();
+    cleaned = cleaned
+      .replace(/```json/g, '')
+      .replace(/```/g, '')
+      .trim();
 
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
@@ -448,7 +497,11 @@ Nhược điểm: ${product.cons?.join('; ') || 'N/A'}
 
     try {
       const parsed = JSON.parse(cleaned);
-      if (typeof parsed === 'object' && parsed !== null && Array.isArray(parsed.scenes)) {
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        Array.isArray(parsed.scenes)
+      ) {
         return parsed as RawScriptLlmOutput;
       }
       return null;
@@ -458,7 +511,10 @@ Nhược điểm: ${product.cons?.join('; ') || 'N/A'}
     }
   }
 
-  private normalizeMediaType(input?: string, sceneIndex: number = 0): MediaType {
+  private normalizeMediaType(
+    input?: string,
+    sceneIndex: number = 0,
+  ): MediaType {
     if (typeof input === 'string') {
       const lower = input.toLowerCase().trim() as MediaType;
       if (VALID_MEDIA_TYPES.includes(lower)) {
@@ -486,7 +542,7 @@ Nhược điểm: ${product.cons?.join('; ') || 'N/A'}
       duration: script.duration,
       language: script.language,
       hook: script.hook,
-      scenes: (script.scenes as unknown as ScriptScene[]) || [],
+      scenes: script.scenes || [],
       cta: script.cta,
       status: script.status,
       createdAt: script.createdAt,
@@ -494,7 +550,10 @@ Nhược điểm: ${product.cons?.join('; ') || 'N/A'}
     };
   }
 
-  private buildFallbackScript(contentIdea: any, product: any): RawScriptLlmOutput {
+  private buildFallbackScript(
+    contentIdea: any,
+    product: any,
+  ): RawScriptLlmOutput {
     return {
       title: contentIdea.title,
       duration: 35,
@@ -506,7 +565,8 @@ Nhược điểm: ${product.cons?.join('; ') || 'N/A'}
 
   private buildFallbackScenes(contentIdea: any): ScriptScene[] {
     const hookLine = contentIdea.hook || contentIdea.title;
-    const ctaLine = contentIdea.recommendedCTA || 'Xem chi tiết ở link bên dưới!';
+    const ctaLine =
+      contentIdea.recommendedCTA || 'Xem chi tiết ở link bên dưới!';
     const keyMsg = contentIdea.keyMessage || contentIdea.description;
 
     return [
@@ -517,7 +577,8 @@ Nhược điểm: ${product.cons?.join('; ') || 'N/A'}
         duration: 4,
         narration: hookLine,
         onScreenText: hookLine.substring(0, 30).toUpperCase(),
-        visualDirection: 'Show product hero image with fast zoom and attention grabbing title',
+        visualDirection:
+          'Show product hero image with fast zoom and attention grabbing title',
         mediaType: 'product_image',
       },
       {
@@ -527,7 +588,8 @@ Nhược điểm: ${product.cons?.join('; ') || 'N/A'}
         duration: 8,
         narration: `Nếu bạn đang gặp phải tình trạng ${contentIdea.painPoint || 'băn khoăn lựa chọn'}, đây chính là giải pháp dành cho bạn.`,
         onScreenText: 'GIẢI PHÁP TỐI ƯU',
-        visualDirection: 'Show close-up details of product features in daily use',
+        visualDirection:
+          'Show close-up details of product features in daily use',
         mediaType: 'product_video',
       },
       {
@@ -537,7 +599,8 @@ Nhược điểm: ${product.cons?.join('; ') || 'N/A'}
         duration: 10,
         narration: keyMsg,
         onScreenText: 'ĐIỂM NỔI BẬT',
-        visualDirection: 'Show product value in action with smooth camera motion',
+        visualDirection:
+          'Show product value in action with smooth camera motion',
         mediaType: 'product_image',
       },
       {
@@ -547,7 +610,8 @@ Nhược điểm: ${product.cons?.join('; ') || 'N/A'}
         duration: 8,
         narration: ctaLine,
         onScreenText: 'XEM THÔNG TIN Ở LINK',
-        visualDirection: 'Show product hero shot with price tag and clear Call-To-Action overlay',
+        visualDirection:
+          'Show product hero shot with price tag and clear Call-To-Action overlay',
         mediaType: 'product_image',
       },
     ];

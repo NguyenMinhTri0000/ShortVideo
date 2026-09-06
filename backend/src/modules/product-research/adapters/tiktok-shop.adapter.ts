@@ -19,7 +19,9 @@ export class TikTokShopAdapter extends ProductSourceAdapter {
   }
 
   async extract(url: string): Promise<RawProductData> {
-    this.logger.log(`[TikTokShopAdapter] Extracting TikTok Shop product: ${url}`);
+    this.logger.log(
+      `[TikTokShopAdapter] Extracting TikTok Shop product: ${url}`,
+    );
     const rawData = await this.genericAdapter.extract(url);
     return {
       ...rawData,

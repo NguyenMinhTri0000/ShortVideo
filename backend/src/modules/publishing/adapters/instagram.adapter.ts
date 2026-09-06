@@ -37,7 +37,8 @@ export class InstagramAdapter implements PlatformAdapter {
     ).trim();
 
     if (!appId) missing.push('INSTAGRAM_CLIENT_ID (or FACEBOOK_APP_ID)');
-    if (!appSecret) missing.push('INSTAGRAM_CLIENT_SECRET (or FACEBOOK_APP_SECRET)');
+    if (!appSecret)
+      missing.push('INSTAGRAM_CLIENT_SECRET (or FACEBOOK_APP_SECRET)');
 
     return missing;
   }
@@ -46,7 +47,10 @@ export class InstagramAdapter implements PlatformAdapter {
     return this.getMissingConfig().length === 0;
   }
 
-  getAuthUrl(redirectUri: string, state = 'instagram_auth'): OAuthAuthUrlResult {
+  getAuthUrl(
+    redirectUri: string,
+    state = 'instagram_auth',
+  ): OAuthAuthUrlResult {
     const appId =
       this.configService.get<string>('INSTAGRAM_CLIENT_ID') ||
       this.configService.get<string>('FACEBOOK_APP_ID') ||
@@ -57,7 +61,10 @@ export class InstagramAdapter implements PlatformAdapter {
     return { url, state };
   }
 
-  async handleCallback(code: string, redirectUri: string): Promise<OAuthTokenResult> {
+  async handleCallback(
+    code: string,
+    redirectUri: string,
+  ): Promise<OAuthTokenResult> {
     const appId =
       this.configService.get<string>('INSTAGRAM_CLIENT_ID') ||
       this.configService.get<string>('FACEBOOK_APP_ID') ||
@@ -104,7 +111,7 @@ export class InstagramAdapter implements PlatformAdapter {
         const igBusinessId = igRes.data?.instagram_business_account?.id;
         if (igBusinessId) {
           accountId = igBusinessId;
-          
+
           // Fetch real Instagram username
           try {
             const igUserRes = await axios.get(
@@ -138,26 +145,39 @@ export class InstagramAdapter implements PlatformAdapter {
       if (axios.isAxiosError(err) && err.response?.data?.error) {
         const metaErr = err.response.data.error;
         this.logger.error(`Instagram OAuth error: ${JSON.stringify(metaErr)}`);
-        throw new Error(`Instagram OAuth token exchange failed: ${metaErr.message || JSON.stringify(metaErr)}`);
+        throw new Error(
+          `Instagram OAuth token exchange failed: ${metaErr.message || JSON.stringify(metaErr)}`,
+        );
       }
       throw err;
     }
   }
 
-  async publish(account: PlatformAccount, params: PublishParams): Promise<PublishResult> {
+  async publish(
+    account: PlatformAccount,
+    params: PublishParams,
+  ): Promise<PublishResult> {
     const decryptedToken = this.encryptionService.decrypt(account.accessToken);
 
     if (!this.isConfigured() || !decryptedToken || !account.accountId) {
-      this.logger.warn(`Instagram Reels publishing failed: Adapter not fully configured or missing account ID/token for account ${account.id}`);
+      this.logger.warn(
+        `Instagram Reels publishing failed: Adapter not fully configured or missing account ID/token for account ${account.id}`,
+      );
       return {
         success: false,
         errorCode: 'NOT_CONFIGURED',
-        errorMessage: 'Instagram Reels API is not fully configured with Graph API credentials or connected account.',
+        errorMessage:
+          'Instagram Reels API is not fully configured with Graph API credentials or connected account.',
       };
     }
 
     try {
-      const captionText = [params.caption || params.title || '', ...(params.hashtags || []).map((h) => (h.startsWith('#') ? h : `#${h}`))]
+      const captionText = [
+        params.caption || params.title || '',
+        ...(params.hashtags || []).map((h) =>
+          h.startsWith('#') ? h : `#${h}`,
+        ),
+      ]
         .filter(Boolean)
         .join(' ');
 
@@ -217,25 +237,40 @@ export class InstagramAdapter implements PlatformAdapter {
       return {
         success: Boolean(mediaId),
         platformPostId: mediaId || creationId,
-        platformUrl: mediaId ? `https://www.instagram.com/p/${mediaId}` : undefined,
+        platformUrl: mediaId
+          ? `https://www.instagram.com/p/${mediaId}`
+          : undefined,
         publishedAt: new Date(),
         rawResponse: publishRes.data,
       };
     } catch (error: any) {
-      this.logger.error(`Instagram Reels publish request failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Instagram Reels publish request failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         errorCode: error.response?.data?.error?.code || 'INSTAGRAM_API_ERROR',
-        errorMessage: error.response?.data?.error?.message || error.message || 'Error executing Instagram API request.',
+        errorMessage:
+          error.response?.data?.error?.message ||
+          error.message ||
+          'Error executing Instagram API request.',
         rawResponse: error.response?.data,
       };
     }
   }
 
-  async getPostStatus(account: PlatformAccount, platformPostId: string): Promise<PublishResult> {
+  async getPostStatus(
+    account: PlatformAccount,
+    platformPostId: string,
+  ): Promise<PublishResult> {
     const decryptedToken = this.encryptionService.decrypt(account.accessToken);
     if (!decryptedToken) {
-      return { success: false, errorCode: 'NOT_CONFIGURED', errorMessage: 'Missing access token.' };
+      return {
+        success: false,
+        errorCode: 'NOT_CONFIGURED',
+        errorMessage: 'Missing access token.',
+      };
     }
 
     try {
@@ -250,14 +285,28 @@ export class InstagramAdapter implements PlatformAdapter {
         rawResponse: response.data,
       };
     } catch (error: any) {
-      return { success: false, errorCode: 'STATUS_CHECK_FAILED', errorMessage: error.message };
+      return {
+        success: false,
+        errorCode: 'STATUS_CHECK_FAILED',
+        errorMessage: error.message,
+      };
     }
   }
 
-  async fetchAnalytics(account: PlatformAccount, platformPostId: string): Promise<PlatformMetrics> {
+  async fetchAnalytics(
+    account: PlatformAccount,
+    platformPostId: string,
+  ): Promise<PlatformMetrics> {
     const decryptedToken = this.encryptionService.decrypt(account.accessToken);
     if (!decryptedToken) {
-      return { views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0 };
+      return {
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        saves: 0,
+        clicks: 0,
+      };
     }
 
     try {
@@ -276,7 +325,8 @@ export class InstagramAdapter implements PlatformAdapter {
       const comments = getVal('comments');
       const shares = getVal('shares');
       const saves = getVal('saved');
-      const engagementRate = views > 0 ? (likes + comments + shares + saves) / views : 0;
+      const engagementRate =
+        views > 0 ? (likes + comments + shares + saves) / views : 0;
 
       return {
         views,
@@ -289,8 +339,17 @@ export class InstagramAdapter implements PlatformAdapter {
         rawMetadata: response.data,
       };
     } catch (error) {
-      this.logger.warn(`Failed to fetch Instagram analytics for post ${platformPostId}: ${(error as Error).message}`);
-      return { views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0 };
+      this.logger.warn(
+        `Failed to fetch Instagram analytics for post ${platformPostId}: ${(error as Error).message}`,
+      );
+      return {
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        saves: 0,
+        clicks: 0,
+      };
     }
   }
 }

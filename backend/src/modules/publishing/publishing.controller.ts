@@ -11,7 +11,12 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { PublishingService, CreateAccountDto, CreatePublishJobDto, CreateBatchPublishJobsDto } from './publishing.service';
+import {
+  PublishingService,
+  CreateAccountDto,
+  CreatePublishJobDto,
+  CreateBatchPublishJobsDto,
+} from './publishing.service';
 import { PlatformType } from './adapters/platform-adapter.interface';
 
 @Controller('publishing')
@@ -31,7 +36,9 @@ export class PublishingController {
     const plat = platform.toUpperCase() as PlatformType;
     const adapter = this.publishingService.getAdapter(plat);
     const redirectUri = this.getDefaultRedirect(platform);
-    const missingConfig = adapter.getMissingConfig ? adapter.getMissingConfig() : [];
+    const missingConfig = adapter.getMissingConfig
+      ? adapter.getMissingConfig()
+      : [];
 
     let oauthAuthUrl: string | null = null;
     let authUrlError: string | null = null;
@@ -77,9 +84,12 @@ export class PublishingController {
   private getDefaultRedirect(platform: string): string {
     const envKey = `${platform.toUpperCase()}_REDIRECT_URI`;
     if (process.env[envKey]) {
-      return process.env[envKey]!;
+      return process.env[envKey];
     }
-    const baseUrl = process.env.OAUTH_REDIRECT_BASE_URL || process.env.CORS_ORIGIN || 'http://localhost:23000';
+    const baseUrl =
+      process.env.OAUTH_REDIRECT_BASE_URL ||
+      process.env.CORS_ORIGIN ||
+      'http://localhost:23000';
     return `${baseUrl}/api/publishing/accounts/${platform.toLowerCase()}/callback`;
   }
 
@@ -90,7 +100,10 @@ export class PublishingController {
   ) {
     const plat = platform.toUpperCase() as PlatformType;
     const defaultRedirect = this.getDefaultRedirect(platform);
-    return this.publishingService.getOAuthUrl(plat, redirectUri || defaultRedirect);
+    return this.publishingService.getOAuthUrl(
+      plat,
+      redirectUri || defaultRedirect,
+    );
   }
 
   @Get('accounts/:platform/callback')
@@ -100,7 +113,10 @@ export class PublishingController {
     @Query('redirectUri') redirectUri: string,
     @Res() res: Response,
   ) {
-    const frontendUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'http://localhost:23000';
+    const frontendUrl =
+      process.env.FRONTEND_URL ||
+      process.env.CORS_ORIGIN ||
+      'http://localhost:23000';
     try {
       const plat = platform.toUpperCase() as PlatformType;
       const defaultRedirect = this.getDefaultRedirect(platform);
@@ -109,9 +125,13 @@ export class PublishingController {
         code,
         redirectUri || defaultRedirect,
       );
-      return res.redirect(`${frontendUrl}/publishing?accountConnected=${account.id}`);
+      return res.redirect(
+        `${frontendUrl}/publishing?accountConnected=${account.id}`,
+      );
     } catch (err: any) {
-      const errorMessage = encodeURIComponent(err.message || 'OAuth authorization failed.');
+      const errorMessage = encodeURIComponent(
+        err.message || 'OAuth authorization failed.',
+      );
       return res.redirect(`${frontendUrl}/publishing?error=${errorMessage}`);
     }
   }

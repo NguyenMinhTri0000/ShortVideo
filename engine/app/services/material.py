@@ -614,12 +614,40 @@ def process_product_images(
         # Download if HTTP URL
         if img_src.startswith(("http://", "https://")):
             try:
-                r = requests.get(img_src, timeout=15, verify=_get_tls_verify())
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                    "Referer": "https://shopee.vn/",
+                }
+                r = requests.get(img_src, headers=headers, timeout=15, verify=_get_tls_verify())
                 if r.status_code == 200:
                     with open(local_img_path, "wb") as f:
                         f.write(r.content)
                     valid_local_images.append(local_img_path)
                 else:
+                    # Retry with alternate Shopee image URL formats if original returns 404/403
+                    alt_url = None
+                    if "susercontent.com" in img_src or "shopee" in img_src:
+                        clean_src = img_src.split("?")[0]
+                        if not clean_src.endswith(("_tn", ".jpg", ".png", ".jpeg", ".webp")):
+                            alt_url = clean_src + "_tn"
+                        elif clean_src.endswith("_tn"):
+                            alt_url = clean_src[:-3]
+                        elif "down-vn.img.susercontent.com" in clean_src:
+                            alt_url = clean_src.replace("down-vn.img.susercontent.com", "cf.shopee.vn")
+
+                    if alt_url and alt_url != img_src:
+                        try:
+                            r_alt = requests.get(alt_url, headers=headers, timeout=15, verify=_get_tls_verify())
+                            if r_alt.status_code == 200:
+                                with open(local_img_path, "wb") as f:
+                                    f.write(r_alt.content)
+                                valid_local_images.append(local_img_path)
+                                logger.info(f"successfully downloaded product image using alt URL: {alt_url}")
+                                continue
+                        except Exception:
+                            pass
+
                     logger.warning(f"failed download image HTTP {r.status_code}: {img_src}")
             except Exception as e:
                 logger.warning(f"failed to download product image {img_src}: {e}")

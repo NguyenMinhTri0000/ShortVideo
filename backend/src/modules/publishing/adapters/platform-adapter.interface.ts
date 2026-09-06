@@ -61,9 +61,18 @@ export interface PlatformAdapter {
   readonly platform: PlatformType;
   isConfigured(): boolean;
   getMissingConfig?(): string[];
-  publish(account: PlatformAccount, params: PublishParams): Promise<PublishResult>;
-  getPostStatus(account: PlatformAccount, platformPostId: string): Promise<PublishResult>;
-  fetchAnalytics(account: PlatformAccount, platformPostId: string): Promise<PlatformMetrics>;
+  publish(
+    account: PlatformAccount,
+    params: PublishParams,
+  ): Promise<PublishResult>;
+  getPostStatus(
+    account: PlatformAccount,
+    platformPostId: string,
+  ): Promise<PublishResult>;
+  fetchAnalytics(
+    account: PlatformAccount,
+    platformPostId: string,
+  ): Promise<PlatformMetrics>;
   getAuthUrl?(redirectUri: string, state?: string): OAuthAuthUrlResult;
   handleCallback?(code: string, redirectUri: string): Promise<OAuthTokenResult>;
   refreshAuthToken?(account: PlatformAccount): Promise<OAuthTokenResult>;
