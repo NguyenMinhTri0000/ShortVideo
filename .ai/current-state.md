@@ -18,6 +18,7 @@
   - `TASK-005`: Sanitize invalid Gemini model names and add global exception handling (`.ai/tasks/TASK-005-sanitize-gemini-models-and-enhance-error-handling.md`)
   - `TASK-006`: Harden content strategy pipeline against TypeErrors and unhandled 500 errors (`.ai/tasks/TASK-006-harden-content-strategy-pipeline.md`)
   - `TASK-007`: Verify Gemini API Key Functionality (`.ai/tasks/TASK-007-verify-gemini-api-key.md`)
+  - `TASK-008`: Fix TypeScript Build Error in ContentStrategyService (`.ai/tasks/TASK-008-fix-content-strategy-build-error.md`)
 - **Blocked Tasks**: None
 - **Next Recommended Task**: `TASK-002`: Clean up existing ESLint technical debt (`.ai/tasks/TASK-002-cleanup-eslint-tech-debt.md`)
 

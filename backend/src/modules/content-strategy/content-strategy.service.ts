@@ -260,7 +260,7 @@ export class ContentStrategyService {
         keyMessage: item.keyMessage,
         hook: item.hook,
         recommendedCTA: item.recommendedCTA,
-        priority: item.priority,
+        priority: item.priority ?? (index + 1),
         status: 'draft',
         createdAt: new Date(),
         updatedAt: new Date(),
