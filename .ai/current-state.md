@@ -13,6 +13,7 @@
 - **Completed Tasks**:
   - `TASK-000`: Setup Repository Structure & AI Memory (`.ai/`)
   - `TASK-001`: Verify Autonomous Development Workflow Setup (`.ai/tasks/TASK-001-setup-verification.md`)
+  - `TASK-003`: Add Autonomous Development Workflow Quickstart Guide (`.ai/tasks/TASK-003-quickstart-guide.md`)
 - **Blocked Tasks**: None
 - **Next Recommended Task**: `TASK-002`: Clean up existing ESLint technical debt (`.ai/tasks/TASK-002-cleanup-eslint-tech-debt.md`)
 
@@ -20,7 +21,7 @@
 
 ## Code Quality Baselines & Technical Debt
 - **Official ESLint Baseline**: **833 Errors** (Backend: 806, Frontend: 27) — Documented in [.ai/baseline.md](file:///home/tringuyen/Code/short-video/.ai/baseline.md).
-- **Verification Rule**: Zero-regression policy enforced (`Current Errors <= 833`). Unrelated tasks are unblocked while TASK-002 tracks debt cleanup.
+- **Verification Rule**: Baseline-aware zero-regression policy enforced (`Current Errors <= 833`). Unrelated tasks are unblocked while TASK-002 tracks debt cleanup.
 
 ---
 
@@ -34,7 +35,6 @@
 ---
 
 ## Latest Changes
-- Verified and marked `TASK-001` as `COMPLETED`. Independent baseline audit confirmed 0 lint errors introduced by TASK-001.
-- Created `.ai/baseline.md` to record 833 pre-existing ESLint errors as technical debt.
-- Updated `.agents/skills/task-verification/SKILL.md` with baseline-aware verification rules.
-- Created `TASK-002` for future ESLint technical debt refactoring.
+- Upgraded Autonomous Workflow to support zero-friction product requirement entrypoint via `/dev <requirement>`.
+- Verified entrypoint execution with test requirement (`TASK-003`), automated breakdown, implementation, verification gate execution, and state synchronization.
+- All agent roles, reusable skills, task schemas, dependency engine rules, baseline-aware verification gate logic, and quickstart documentation (`.ai/agent-workflow.md`) are active.

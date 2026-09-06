@@ -4,49 +4,64 @@ This document provides complete instructions and architecture documentation for 
 
 ---
 
-## 1. System Architecture & Agent Roles
+## 1. System Architecture & Unified Entrypoint (`/dev`)
 
-The pipeline operates on a multi-role collaborative loop defined in [`.agents/agents.md`](file:///home/tringuyen/Code/short-video/.agents/agents.md):
+The pipeline operates on a multi-role collaborative loop defined in [`.agents/agents.md`](file:///home/tringuyen/Code/short-video/.agents/agents.md) and triggered via the `/dev` entrypoint:
 
 ```
-                       ┌──────────────────────┐
-                       │     USER ROADMAP     │
-                       └──────────┬───────────┘
-                                  │
-                                  ▼
-                       ┌──────────────────────┐
-                       │  LEAD ORCHESTRATOR   │
-                       └──────────┬───────────┘
-                                  │
-      ┌───────────────────────────┼───────────────────────────┐
-      ▼                           ▼                           ▼
-┌───────────┐               ┌───────────┐               ┌───────────┐
-│  PLANNER  │               │IMPLEMENTER│               │QA/VERIFIER│
-└─────┬─────┘               └─────┬─────┘               └─────┬─────┘
-      │                           │                           │
-      └───────────────────────────┼───────────────────────────┘
-                                  │
-                                  ▼
-                       ┌──────────────────────┐
-                       │   REVIEWER AGENT     │
-                       └──────────┬───────────┘
-                                  │
-                                  ▼
-                       ┌──────────────────────┐
-                       │ UPDATE STATE & REPEAT│
-                       └──────────────────────┘
+                       ┌───────────────────────────────┐
+                       │  USER PROMPT: /dev <request>  │
+                       └───────────────┬───────────────┘
+                                       │
+                                       ▼
+                       ┌───────────────────────────────┐
+                       │      LEAD ORCHESTRATOR        │
+                       └───────────────┬───────────────┘
+                                       │
+       ┌───────────────────────────────┼───────────────────────────────┐
+       ▼                               ▼                               ▼
+┌──────────────┐               ┌──────────────┐               ┌──────────────┐
+│   PLANNER    │               │ IMPLEMENTER  │               │ QA/VERIFIER  │
+└──────┬───────┘               └──────┬───────┘               └──────┬───────┘
+       │                               │                               │
+       └───────────────────────────────┼───────────────────────────────┘
+                                       │
+                                       ▼
+                       ┌───────────────────────────────┐
+                       │        REVIEWER AGENT         │
+                       └───────────────┬───────────────┘
+                                       │
+                                       ▼
+                       ┌───────────────────────────────┐
+                       │  UPDATE STATE & EXECUTE NEXT  │
+                       └───────────────────────────────┘
 ```
-
-### Roles Breakdown:
-1. **Lead / Orchestrator**: Manages state, dependency graph, task prioritization, loop control.
-2. **Planner / Architect**: Analyzes task specs, checks project architecture, defines implementation steps.
-3. **Implementer**: Modifies repository code according to project conventions.
-4. **QA / Verifier**: Runs automated tests, builds, linters, checks acceptance criteria.
-5. **Reviewer**: Audits git diffs, ensures no unintended side effects, authorizes `COMPLETED` state.
 
 ---
 
-## 2. Task Specification & Format Standards
+## 2. Zero-Friction Entrypoint Usage (`/dev <requirement>`)
+
+Users do NOT need to paste manual autonomous instructions. Simply prompt:
+
+```text
+/dev <Requirement description>
+```
+
+### Examples:
+- `/dev Thêm chức năng cho phép user chỉnh sửa AI script trước khi render video.`
+- `/dev Tối ưu hóa thời gian render video bằng cách cache audio assets.`
+- `/dev` (Runs/resumes existing task roadmap in `.ai/tasks/`)
+
+### Automatic Workflow Steps:
+1. **Context Loading**: Agent reads project memory (`.ai/project.md`, `.ai/architecture.md`, `.ai/conventions.md`, `.ai/current-state.md`, `.ai/baseline.md`).
+2. **De-duplication**: Scans `.ai/tasks/*.md` to avoid duplicate task generation.
+3. **Decomposition**: Breaks requirement into structured task files (`.ai/tasks/TASK-XXX.md`) with YAML dependencies.
+4. **Autonomous Execution**: Executes task loop (Plan → Implement → Baseline-Aware Verify → Update State).
+5. **Continuous Iteration**: Automatically proceeds to next unblocked task until all requirement tasks are `COMPLETED`.
+
+---
+
+## 3. Task Specification & Format Standards
 
 All tasks live in `.ai/tasks/` as Markdown files with YAML frontmatter.
 
@@ -88,55 +103,27 @@ Commands used to verify completion (e.g. `npm test`, `pytest`, `tsc`).
 Execution logs, findings, or retry details.
 ```
 
-### Valid Task Statuses:
-- `TODO`: Pending execution.
-- `IN_PROGRESS`: Currently being planned, implemented, or verified.
-- `BLOCKED`: Failed execution after max retries, broken dependency, or waiting for human approval.
-- `COMPLETED`: Fully verified and merged into system state.
-
 ---
 
-## 3. Dependency Engine
+## 4. Verification Gate & Baseline-Aware Rule
 
-Tasks can declare dependencies via the `depends_on` array in their frontmatter:
-
-```yaml
----
-id: TASK-003
-title: Build Video Publishing Service
-status: TODO
-priority: high
-depends_on:
-  - TASK-001
-  - TASK-002
----
-```
-
-### Resolution Rules:
-- The Orchestrator MUST NOT select `TASK-003` if `TASK-001` or `TASK-002` status is not `COMPLETED`.
-- If a dependency is missing or `BLOCKED`, the Orchestrator finds the next highest priority `TODO` task whose dependencies are satisfied.
-- If no executable task is available and uncompleted tasks remain, the Orchestrator marks the pipeline as `BLOCKED` and alerts the user with details.
-
----
-
-## 4. Verification Gate (The 8-Point Gate)
-
-A task MUST NEVER be marked `COMPLETED` based on written code alone. It requires passing 8 strict checks:
+A task MUST NEVER be marked `COMPLETED` based on written code alone. It requires passing strict checks:
 
 1. **Code Existence**: Files created/modified as planned.
 2. **Requirements Satisfied**: All functional items built.
 3. **Acceptance Criteria Checked**: Every `- [ ]` ticked to `- [x]`.
 4. **Automated Tests Pass**: Unit/integration tests return exit code `0`.
-5. **Build / Typecheck Pass**: Clean compilation (`tsc`, `lint`, `build`).
-6. **No Regressions**: System functionality remains stable.
-7. **Git Diff Audit**: No temporary code, secrets, or clutter.
-8. **State Synchronization**: `.ai/current-state.md` updated.
+5. **Build & Typecheck Pass**: Clean compilation (`nest build`, `next build`, `tsc --noEmit`).
+6. **Baseline-Aware Lint Rule**: Linter errors `<= 833` (Official Repository Baseline in `.ai/baseline.md`). No new linter errors introduced in active task diff.
+7. **Zero Regression Guarantee**: System functionality remains stable.
+8. **Git Diff Audit**: No temporary code, secrets, or clutter.
+9. **State Synchronization**: `.ai/current-state.md` updated.
 
 ---
 
 ## 5. Human Approval Gate
 
-The pipeline runs fully autonomously for standard code, test, and documentation tasks.
+The pipeline runs fully autonomously for standard feature code, test, and documentation tasks.
 
 **Pause & Request User Approval ONLY when**:
 - Requirement is ambiguous or incomplete.
@@ -149,48 +136,24 @@ The pipeline runs fully autonomously for standard code, test, and documentation 
 
 ---
 
-## 6. Failure Recovery Protocol
+## 6. Quickstart Guide for Developers
 
-When verification fails during task execution:
-
-```
-[IMPLEMENT] ──► [TEST] ──► [FAIL] ──► [FETCH LOGS & DIAGNOSE]
-                                            │
-                                            ▼
-[RETEST] ◄── [VERIFY] ◄── [APPLY FIX] ◄─────┘
-   │
-   ├── PASS ──► [MARK COMPLETED & NEXT TASK]
-   └── FAIL ──► (Retry up to 3 times) ──► [MARK BLOCKED & NOTIFY USER]
-```
-
----
-
-## 7. How to Run the Autonomous Workflow (`/dev`)
-
-### Command Usage:
-To start or resume autonomous roadmap execution, run the slash command or prompt:
+### How to Trigger an Autonomous Feature Development:
+To request a new feature, bug fix, or refactoring task, type:
 
 ```text
-/dev
+/dev <Requirement description>
 ```
 
-### What Happens:
-1. Orchestrator scans `.ai/tasks/*.md`.
-2. Resolves task priority and dependency graph.
-3. Selects the first executable `TODO` task.
-4. Switches status to `IN_PROGRESS`.
-5. Plans, implements, runs tests, and audits diffs.
-6. Passes Verification Gate and sets status to `COMPLETED`.
-7. Updates `.ai/current-state.md`.
-8. Automatically loops to the next valid task until all tasks are `COMPLETED`.
+### Quick Reference Commands:
+- `/dev Thêm chức năng cho phép user chỉnh sửa AI script trước khi render video.`
+- `/dev Tối ưu hóa performance database query cho API publishing.`
+- `/dev` (Runs or resumes unblocked tasks in `.ai/tasks/`)
 
----
+### Automated Loop Execution:
+1. Agent parses requirement and checks for existing duplicate tasks.
+2. Agent breaks requirement into structured task specs in `.ai/tasks/`.
+3. Agent resolves dependency tree and selects executable `TODO` tasks.
+4. Agent plans, implements, runs automated test suites, and audits diffs.
+5. Agent updates `.ai/current-state.md` and seamlessly continues to the next unblocked task.
 
-## 8. Creating New Tasks
-
-To add a new feature or roadmap item:
-1. Create a file in `.ai/tasks/TASK-XXX-<name>.md`.
-2. Populate using the standard Task Template.
-3. Set `status: TODO`.
-4. Specify `priority` and `depends_on` list.
-5. Trigger `/dev`.
