@@ -314,6 +314,20 @@ def download_videos(
     max_clip_duration: int = 5,
     match_script_order: bool = False,
 ) -> List[str]:
+    if isinstance(search_terms, str):
+        if search_terms.startswith("Error"):
+            search_terms = []
+        else:
+            search_terms = [search_terms]
+    elif not isinstance(search_terms, list):
+        search_terms = []
+
+    cleaned_terms = []
+    for term in search_terms:
+        if isinstance(term, str) and len(term.strip()) > 1 and not term.startswith("Error"):
+            cleaned_terms.append(term.strip())
+    search_terms = cleaned_terms
+
     search_videos = search_videos_pexels
     if source == "pixabay":
         search_videos = search_videos_pixabay

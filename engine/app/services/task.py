@@ -50,15 +50,17 @@ def generate_terms(task_id, params, video_script):
             amount=8 if params.match_materials_to_script else 5,
             match_script_order=params.match_materials_to_script,
         )
-    else:
-        if isinstance(video_terms, str):
-            video_terms = [term.strip() for term in re.split(r"[,，]", video_terms)]
-        elif isinstance(video_terms, list):
-            video_terms = [term.strip() for term in video_terms]
+    if isinstance(video_terms, str):
+        if video_terms.startswith("Error"):
+            video_terms = [params.video_subject] if params.video_subject else ["product"]
         else:
-            raise ValueError("video_terms must be a string or a list of strings.")
+            video_terms = [term.strip() for term in re.split(r"[,，]", video_terms)]
+    elif isinstance(video_terms, list):
+        video_terms = [term.strip() for term in video_terms if isinstance(term, str) and term.strip()]
+    else:
+        video_terms = [params.video_subject] if params.video_subject else ["product"]
 
-        logger.debug(f"video terms: {utils.to_json(video_terms)}")
+    logger.debug(f"video terms: {utils.to_json(video_terms)}")
 
     if not video_terms:
         sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)

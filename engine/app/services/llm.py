@@ -11,8 +11,15 @@ from openai.types.chat import ChatCompletion
 from app.config import config
 
 _max_retries = 5
-_DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
-_DEPRECATED_GEMINI_MODELS = {"gemini-pro", "gemini-1.0-pro", "gemini-2.5-flash"}
+_DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
+_DEPRECATED_GEMINI_MODELS = {
+    "gemini-pro",
+    "gemini-1.0-pro",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-2.0-flash",
+    "gemini-2.5-flash",
+}
 MIN_SCRIPT_PARAGRAPH_NUMBER = 1
 MAX_SCRIPT_PARAGRAPH_NUMBER = 10
 MAX_SCRIPT_PROMPT_LENGTH = 2000
@@ -451,22 +458,48 @@ def _generate_response(prompt: str) -> str:
                     },
                 ]
 
-                model = genai.GenerativeModel(
-                    model_name=model_name,
-                    generation_config=generation_config,
-                    safety_settings=safety_settings,
-                )
+                candidate_models = [model_name]
+                for fb in ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-3.8-flash"]:
+                    if fb not in candidate_models:
+                        candidate_models.append(fb)
 
-                try:
-                    response = model.generate_content(prompt)
-                    candidates = response.candidates
-                    generated_text = candidates[0].content.parts[0].text
-                except (AttributeError, IndexError) as e:
-                    logger.warning(
-                        f"gemini returned invalid response content: {str(e)}"
-                    )
+                generated_text = None
+                last_err = None
+                for candidate_model in candidate_models:
+                    try:
+                        model = genai.GenerativeModel(
+                            model_name=candidate_model,
+                            generation_config=generation_config,
+                            safety_settings=safety_settings,
+                        )
+                        response = model.generate_content(prompt)
+                        candidates = response.candidates
+                        generated_text = candidates[0].content.parts[0].text
+                        if candidate_model != model_name:
+                            logger.warning(
+                                f"gemini model '{model_name}' failed, successfully used fallback model '{candidate_model}'"
+                            )
+                        break
+                    except (AttributeError, IndexError) as e:
+                        logger.warning(
+                            f"gemini returned invalid response content for model '{candidate_model}': {str(e)}"
+                        )
+                        last_err = e
+                    except Exception as e:
+                        last_err = e
+                        err_str = str(e)
+                        if "404" in err_str or "not found" in err_str.lower() or "no longer available" in err_str.lower():
+                            logger.warning(
+                                f"gemini model '{candidate_model}' returned 404/unavailable: {err_str}. Trying next fallback model..."
+                            )
+                            continue
+                        else:
+                            logger.warning(f"gemini error with model '{candidate_model}': {err_str}")
+                            continue
+
+                if generated_text is None:
                     raise ValueError(
-                        f"[{llm_provider}] returned invalid response content"
+                        f"[{llm_provider}] failed to generate response: {str(last_err)}"
                     )
 
                 return _normalize_text_response(generated_text, llm_provider)
@@ -889,33 +922,38 @@ Please note that you must use English for generating video search terms; Chinese
     for i in range(_max_retries):
         try:
             response = _generate_response(prompt)
-            if "Error: " in response:
-                logger.error(f"failed to generate video script: {response}")
-                return response
+            if isinstance(response, str) and "Error: " in response:
+                logger.error(f"failed to generate video terms from LLM: {response}")
+                continue
             search_terms = json.loads(_strip_code_fence(response))
             if not isinstance(search_terms, list) or not all(
                 isinstance(term, str) for term in search_terms
             ):
                 logger.error("response is not a list of strings.")
+                search_terms = []
                 continue
 
         except Exception as e:
             logger.warning(f"failed to generate video terms: {str(e)}")
-            if response:
+            if response and isinstance(response, str):
                 match = re.search(r"\[.*]", response, re.DOTALL)
                 if match:
                     try:
-                        search_terms = json.loads(match.group())
+                        parsed = json.loads(match.group())
+                        if isinstance(parsed, list):
+                            search_terms = parsed
                     except Exception as e:
-                        # 这里保留重试流程，但必须记录 LLM 返回的非标准 JSON，
-                        # 否则后续排查搜索词为空时无法定位
-                        # 是模型格式问题还是解析逻辑问题。
-                        logger.warning(f"failed to generate video terms: {str(e)}")
+                        logger.warning(f"failed to parse regex video terms: {str(e)}")
 
-        if search_terms and len(search_terms) > 0:
+        if search_terms and isinstance(search_terms, list) and len(search_terms) > 0:
             break
-        if i < _max_retries:
+        if i < _max_retries - 1:
             logger.warning(f"failed to generate video terms, trying again... {i + 1}")
+
+    if not isinstance(search_terms, list) or not search_terms:
+        logger.warning("generate_terms: using fallback terms from video_subject")
+        fallback_term = video_subject.strip() if video_subject else "product"
+        search_terms = [fallback_term]
 
     logger.success(f"completed: \n{search_terms}")
     return search_terms

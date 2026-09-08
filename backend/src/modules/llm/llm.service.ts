@@ -100,7 +100,7 @@ export class LlmService {
 
     const rawModel = modelKey
       ? await this.getSetting(modelKey, '')
-      : await this.getSetting('llm_model', 'gemini-2.0-flash');
+      : await this.getSetting('llm_model', 'gemini-3.6-flash');
 
     const sanitizedModel = this.sanitizeModelName(provider, rawModel);
 
@@ -127,15 +127,18 @@ export class LlmService {
     const trimmed = (model || '').trim();
     if (provider === 'gemini') {
       const invalidGeminiModels = [
-        'gemini-3.6-flash',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-1.5-pro',
         'gemini-1.0-pro',
         'gemini-pro',
       ];
       if (!trimmed || invalidGeminiModels.includes(trimmed.toLowerCase())) {
-        return 'gemini-2.0-flash';
+        return 'gemini-3.6-flash';
       }
     }
-    return trimmed || 'gemini-2.0-flash';
+    return trimmed || 'gemini-3.6-flash';
   }
 
   async generateIdeas(

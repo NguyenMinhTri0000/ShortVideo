@@ -25,6 +25,7 @@
   - `TASK-012`: Fix CLI execution exit code null false failure and enhance video processor completion check (`.ai/tasks/TASK-012-fix-cli-exit-code-null-and-video-processor-fallback.md`)
   - `TASK-013`: Fix stuck queue job execution on job cancellation and handle orphan process cleanup (`.ai/tasks/TASK-013-fix-stuck-queue-job-execution.md`)
   - `TASK-014`: Add feature to enable/disable subtitle generation step in video creation pipeline (`.ai/tasks/TASK-014-enable-disable-subtitle-step.md`)
+  - `TASK-015`: Fix Gemini 404 model error and stuck material download loop (`.ai/tasks/TASK-015-fix-gemini-404-model-error-and-stuck-material-download.md`)
 - **Blocked Tasks**: None
 - **Next Recommended Task**: `TASK-002`: Clean up existing ESLint technical debt (`.ai/tasks/TASK-002-cleanup-eslint-tech-debt.md`)
 
