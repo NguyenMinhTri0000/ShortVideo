@@ -200,9 +200,11 @@ def generate_subtitle(task_id, params, video_script, sub_maker, audio_file):
     Returns:
         - subtitle_path: path to the generated subtitle file
     '''
-    logger.info("\n\n## generating subtitle")
     if not params.subtitle_enabled:
+        logger.info("\n\n## subtitle generation disabled, skipping...")
         return ""
+
+    logger.info("\n\n## generating subtitle")
 
     subtitle_path = path.join(utils.task_dir(task_id), "subtitle.srt")
     subtitle_provider = config.app.get("subtitle_provider", "edge").strip().lower()

@@ -62,6 +62,7 @@ type SettingsData = {
   default_voice?: string;
   default_aspect_ratio?: string;
   default_video_source?: string;
+  subtitle_enabled?: string;
 };
 
 type VideoGenerationConfig = {
@@ -163,6 +164,12 @@ export default function Ideas() {
     queryKey: ["settings"],
     queryFn: () => api.get("/settings").then((res) => res.data),
   });
+
+  useEffect(() => {
+    if (settings.subtitle_enabled !== undefined) {
+      setConfigSubtitleEnabled(settings.subtitle_enabled !== "false");
+    }
+  }, [settings.subtitle_enabled]);
 
   const isAiReady = settings.llm_ready === "true";
   const activeAiProvider = settings.llm_provider || "groq";

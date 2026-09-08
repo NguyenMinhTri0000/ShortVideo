@@ -43,6 +43,7 @@ type JobDetail = JobListItem & {
     aspect_ratio?: string;
     video_source?: string;
     voice_name?: string;
+    subtitle_enabled?: boolean | string;
   } | null;
   logs?: JobLog[];
 };
@@ -185,14 +186,24 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function PipelineStepper({ status }: { status: string }) {
-  const currentIdx = PIPELINE_STEPS.findIndex((s) => s.key === status);
+function PipelineStepper({
+  status,
+  subtitleEnabled = true,
+}: {
+  status: string;
+  subtitleEnabled?: boolean;
+}) {
+  const steps = subtitleEnabled
+    ? PIPELINE_STEPS
+    : PIPELINE_STEPS.filter((s) => s.key !== "generating_subtitle");
+
+  const currentIdx = steps.findIndex((s) => s.key === status);
   const isFailed = status === "failed";
   const isCancelled = status === "cancelled";
 
   return (
     <div className="flex items-center gap-0 w-full overflow-x-auto py-1 scrollbar-none">
-      {PIPELINE_STEPS.map((step, idx) => {
+      {steps.map((step, idx) => {
         const isDone =
           !isFailed &&
           !isCancelled &&
@@ -231,7 +242,7 @@ function PipelineStepper({ status }: { status: string }) {
                 {step.label}
               </span>
             </div>
-            {idx < PIPELINE_STEPS.length - 1 && (
+            {idx < steps.length - 1 && (
               <div
                 className={`h-px flex-1 min-w-[12px] mx-0.5 mb-3.5 transition-all ${
                   isDone ? "bg-emerald-700/60" : "bg-zinc-800"
@@ -476,7 +487,14 @@ function JobsInner({ selectedJobId }: { selectedJobId?: string | null }) {
 
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-5 gap-4">
               <div className="rounded-md border border-zinc-900 bg-zinc-900/30 px-4 py-3">
-                <PipelineStepper status={selectedJob.status} />
+                <PipelineStepper
+                  status={selectedJob.status}
+                  subtitleEnabled={
+                    selectedJob.config?.subtitle_enabled !== false &&
+                    (selectedJob.config?.subtitle_enabled as unknown) !==
+                      "false"
+                  }
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -529,6 +547,15 @@ function JobsInner({ selectedJobId }: { selectedJobId?: string | null }) {
                     {
                       label: "Nguồn",
                       value: selectedJob.config?.video_source ?? "pexels",
+                    },
+                    {
+                      label: "Phụ đề",
+                      value:
+                        selectedJob.config?.subtitle_enabled === false ||
+                        (selectedJob.config?.subtitle_enabled as unknown) ===
+                          "false"
+                          ? "Tắt"
+                          : "Bật",
                     },
                     {
                       label: "Giọng",

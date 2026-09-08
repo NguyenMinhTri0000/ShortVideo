@@ -633,3 +633,7 @@ docker compose build frontend && docker compose up -d frontend
 
 docker compose build frontend
 docker compose up -d frontend
+
+build lại
+docker compose down
+docker compose up --build -d

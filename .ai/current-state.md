@@ -24,6 +24,7 @@
   - `TASK-011`: Fix Shopee CDN image download HTTP 404 and implement robust step fallbacks (`.ai/tasks/TASK-011-fix-shopee-image-download-404-and-step-fallbacks.md`)
   - `TASK-012`: Fix CLI execution exit code null false failure and enhance video processor completion check (`.ai/tasks/TASK-012-fix-cli-exit-code-null-and-video-processor-fallback.md`)
   - `TASK-013`: Fix stuck queue job execution on job cancellation and handle orphan process cleanup (`.ai/tasks/TASK-013-fix-stuck-queue-job-execution.md`)
+  - `TASK-014`: Add feature to enable/disable subtitle generation step in video creation pipeline (`.ai/tasks/TASK-014-enable-disable-subtitle-step.md`)
 - **Blocked Tasks**: None
 - **Next Recommended Task**: `TASK-002`: Clean up existing ESLint technical debt (`.ai/tasks/TASK-002-cleanup-eslint-tech-debt.md`)
 
