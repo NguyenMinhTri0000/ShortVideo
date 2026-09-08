@@ -41,14 +41,16 @@ async function recoverStuckJobs(prisma: PrismaService) {
   const logger = new Logger('JobRecovery');
   try {
     const stuckJobs = await prisma.generationJob.findMany({
-      where: { status: { in: ['running', 'queued'] } },
+      where: {
+        status: { notIn: ['completed', 'failed', 'cancelled'] },
+      },
     });
     if (stuckJobs.length === 0) {
       logger.log('No stuck jobs found.');
       return;
     }
     logger.warn(
-      `Found ${stuckJobs.length} stuck jobs from before restart. Failing them...`,
+      `Found ${stuckJobs.length} interrupted jobs from before restart. Failing them...`,
     );
     for (const job of stuckJobs) {
       await prisma.generationJob.update({

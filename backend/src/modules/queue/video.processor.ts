@@ -20,12 +20,30 @@ export const activeProcesses = new Map<
 export function killActiveProcess(jobId: string) {
   const proc = activeProcesses.get(jobId);
   if (proc) {
-    try {
-      proc.kill('SIGKILL');
-    } catch {
-      // ignore
+    if (proc.pid) {
+      try {
+        process.kill(-proc.pid, 'SIGKILL');
+      } catch {
+        try {
+          proc.kill('SIGKILL');
+        } catch {
+          // ignore
+        }
+      }
+    } else {
+      try {
+        proc.kill('SIGKILL');
+      } catch {
+        // ignore
+      }
     }
     activeProcesses.delete(jobId);
+  }
+  try {
+    const { execSync } = require('child_process');
+    execSync(`pkill -9 -f "task-id ${jobId}"`, { stdio: 'ignore' });
+  } catch {
+    // ignore
   }
 }
 
@@ -59,7 +77,15 @@ export class VideoProcessor extends WorkerHost {
     this.logger.log(`Processing video generation job: ${jobId}`);
 
     // Check if job was cancelled before starting
-    if (cancelledJobs.has(jobId)) {
+    const currentJob = await this.prisma.generationJob.findUnique({
+      where: { id: jobId },
+      select: { status: true },
+    });
+    if (
+      cancelledJobs.has(jobId) ||
+      currentJob?.status === 'cancelled' ||
+      currentJob?.status === 'failed'
+    ) {
       cancelledJobs.delete(jobId);
       throw new Error('Job was cancelled before processing started');
     }
@@ -269,7 +295,6 @@ export class VideoProcessor extends WorkerHost {
 
           // Check if cancelled
           if (cancelledJobs.has(jobId)) {
-            cancelledJobs.delete(jobId);
             cleanup();
             return;
           }
@@ -353,6 +378,7 @@ export class VideoProcessor extends WorkerHost {
       pyProcess = spawn(runner.cmd, runner.args, {
         cwd: projectRoot,
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        detached: true,
       });
       activeProcesses.set(jobId, pyProcess);
 
