@@ -296,13 +296,17 @@ def get_video_materials(task_id, params, video_terms, audio_duration):
     if isinstance(product_data, dict) and (product_data.get("images") or product_data.get("videos")):
         logger.info("\n\n## processing product visuals (images & videos) for affiliate video")
         target_p0_duration = audio_duration * p0_ratio
-        product_clips = material.process_product_visuals(
-            task_id=task_id,
-            images=product_data.get("images", []),
-            videos=product_data.get("videos", []),
-            video_aspect=params.video_aspect,
-            target_p0_duration=target_p0_duration,
-        )
+        try:
+            product_clips = material.process_product_visuals(
+                task_id=task_id,
+                images=product_data.get("images", []),
+                videos=product_data.get("videos", []),
+                video_aspect=params.video_aspect,
+                target_p0_duration=target_p0_duration,
+            )
+        except Exception as e:
+            logger.error(f"Error processing product visuals for task {task_id}: {e}", exc_info=True)
+            product_clips = []
 
     if params.video_source == "local":
         logger.info("\n\n## preprocess local materials")

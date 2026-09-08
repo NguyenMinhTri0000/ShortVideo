@@ -2,7 +2,7 @@ import os
 import random
 import shutil
 import threading
-from typing import List
+from typing import List, Optional
 from urllib.parse import urlencode
 
 import requests
@@ -503,9 +503,14 @@ def _create_motion_clip_from_image(
             os.environ["IMAGEIO_FFMPEG_EXE"] = utils.get_ffmpeg_binary()
 
         # 1. Prepare base image canvas with aspect ratio preservation & ambient background
-        with Image.open(local_img_path) as img:
-            img = img.convert("RGB")
-            img_ratio = img.width / img.height
+        with Image.open(local_img_path) as raw_img:
+            raw_img = raw_img.convert("RGB")
+            # Pre-scale extremely large images (e.g. 4000x4000 Shopee raw product photos) to reasonable bounds
+            max_dimension = max(width, height) * 2
+            if raw_img.width > max_dimension or raw_img.height > max_dimension:
+                raw_img.thumbnail((max_dimension, max_dimension), Image.Resampling.BILINEAR)
+
+            img_ratio = raw_img.width / raw_img.height
             target_ratio = width / height
 
             if img_ratio > target_ratio:
@@ -515,12 +520,12 @@ def _create_motion_clip_from_image(
                 new_h = height
                 new_w = max(1, int(height * img_ratio))
 
-            resized_fg = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            resized_fg = raw_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
 
             # Ambient background canvas (blurred & darkened version of image)
-            bg_img = img.resize((width, height), Image.Resampling.BILINEAR)
+            bg_img = raw_img.resize((width, height), Image.Resampling.BILINEAR)
             if hasattr(ImageFilter, "GaussianBlur"):
-                bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=20))
+                bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=15))
 
             enhancer = ImageEnhance.Brightness(bg_img)
             canvas = enhancer.enhance(0.4)
@@ -531,7 +536,7 @@ def _create_motion_clip_from_image(
             canvas.paste(resized_fg, (paste_x, paste_y))
 
             temp_framed_path = output_clip_path + ".framed.jpg"
-            canvas.save(temp_framed_path, "JPEG", quality=95)
+            canvas.save(temp_framed_path, "JPEG", quality=90)
 
         # 2. Build MoviePy clip with dynamic motion
         clip = ImageClip(temp_framed_path).with_duration(clip_duration).with_position("center")
@@ -571,10 +576,14 @@ def _create_motion_clip_from_image(
         final_clip = CompositeVideoClip([motion_clip], size=(width, height))
         final_clip.write_videofile(
             output_clip_path,
-            fps=30,
+            fps=15,
             codec="libx264",
             audio=False,
+            preset="ultrafast",
+            threads=4,
+            ffmpeg_params=["-pix_fmt", "yuv420p"],
             logger=None,
+            write_logfile=True,
         )
 
         try:
@@ -585,11 +594,12 @@ def _create_motion_clip_from_image(
         except Exception:
             pass
 
-        if os.path.exists(temp_framed_path):
-            try:
-                os.remove(temp_framed_path)
-            except Exception:
-                pass
+        for tmp_file in [temp_framed_path, output_clip_path + ".log"]:
+            if os.path.exists(tmp_file):
+                try:
+                    os.remove(tmp_file)
+                except Exception:
+                    pass
 
         return os.path.exists(output_clip_path)
     except Exception as e:
@@ -609,6 +619,7 @@ def process_product_images(
     Applies zoom, pan, float, and detail focus effects to ensure non-static visual dominance.
     """
     import math
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
     if not images:
         return []
@@ -619,27 +630,24 @@ def process_product_images(
     task_dir = utils.task_dir(task_id)
     valid_local_images = []
 
-    for idx, img_src in enumerate(images):
+    def _download_single_image(idx: int, img_src: str) -> Optional[str]:
         if not img_src or not isinstance(img_src, str):
-            continue
+            return None
 
         local_img_path = os.path.join(task_dir, f"prod_img_{idx}.jpg")
-
-        # Download if HTTP URL
         if img_src.startswith(("http://", "https://")):
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                "Referer": "https://shopee.vn/",
+            }
             try:
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-                    "Referer": "https://shopee.vn/",
-                }
-                r = requests.get(img_src, headers=headers, timeout=15, verify=_get_tls_verify())
+                r = requests.get(img_src, headers=headers, timeout=(10, 15), verify=_get_tls_verify())
                 if r.status_code == 200:
                     with open(local_img_path, "wb") as f:
                         f.write(r.content)
-                    valid_local_images.append(local_img_path)
+                    return local_img_path
                 else:
-                    # Retry with alternate Shopee image URL formats if original returns 404/403
                     alt_url = None
                     if "susercontent.com" in img_src or "shopee" in img_src:
                         clean_src = img_src.split("?")[0]
@@ -652,28 +660,37 @@ def process_product_images(
 
                     if alt_url and alt_url != img_src:
                         try:
-                            r_alt = requests.get(alt_url, headers=headers, timeout=15, verify=_get_tls_verify())
+                            r_alt = requests.get(alt_url, headers=headers, timeout=(10, 15), verify=_get_tls_verify())
                             if r_alt.status_code == 200:
                                 with open(local_img_path, "wb") as f:
                                     f.write(r_alt.content)
-                                valid_local_images.append(local_img_path)
                                 logger.info(f"successfully downloaded product image using alt URL: {alt_url}")
-                                continue
+                                return local_img_path
                         except Exception:
                             pass
-
                     logger.warning(f"failed download image HTTP {r.status_code}: {img_src}")
             except Exception as e:
                 logger.warning(f"failed to download product image {img_src}: {e}")
         elif os.path.isfile(img_src):
             try:
                 shutil.copy(img_src, local_img_path)
-                valid_local_images.append(local_img_path)
+                return local_img_path
             except Exception:
                 pass
+        return None
+
+    logger.info(f"Downloading {len(images)} product images concurrently...")
+    with ThreadPoolExecutor(max_workers=min(5, max(1, len(images)))) as executor:
+        future_map = {
+            executor.submit(_download_single_image, idx, img_src): idx
+            for idx, img_src in enumerate(images)
+        }
+        for future in as_completed(future_map):
+            res = future.result()
+            if res:
+                valid_local_images.append(res)
 
     if not valid_local_images:
-        # If all product image downloads returned 404 or failed, generate aesthetic fallback product slide
         try:
             from PIL import Image, ImageDraw
             fallback_img_path = os.path.join(task_dir, "prod_img_fallback.jpg")
@@ -711,11 +728,13 @@ def process_product_images(
     ]
     product_clips = []
 
+    logger.info(f"Rendering {required_clips} product motion clips (clip_duration={clip_duration}s)...")
     for i in range(required_clips):
         img_path = valid_local_images[i % len(valid_local_images)]
         motion_type = motion_presets[i % len(motion_presets)]
         output_clip_path = os.path.join(task_dir, f"prod_clip_{i}.mp4")
 
+        logger.info(f"Generating product motion clip {i + 1}/{required_clips} [{motion_type}]...")
         success = _create_motion_clip_from_image(
             local_img_path=img_path,
             output_clip_path=output_clip_path,
@@ -747,23 +766,25 @@ def process_product_videos(
     if not videos:
         return []
 
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     task_dir = utils.task_dir(task_id)
     valid_video_clips = []
 
-    for idx, vid_src in enumerate(videos):
+    def _download_single_video(idx: int, vid_src: str) -> Optional[str]:
         if not vid_src or not isinstance(vid_src, str):
-            continue
+            return None
 
         local_vid_path = os.path.join(task_dir, f"prod_vid_{idx}.mp4")
 
         if vid_src.startswith(("http://", "https://")):
             try:
-                r = requests.get(vid_src, timeout=30, verify=_get_tls_verify(), stream=True)
+                r = requests.get(vid_src, timeout=(10, 30), verify=_get_tls_verify(), stream=True)
                 if r.status_code == 200:
                     with open(local_vid_path, "wb") as f:
                         for chunk in r.iter_content(chunk_size=8192):
                             f.write(chunk)
-                    valid_video_clips.append(local_vid_path)
+                    return local_vid_path
                 else:
                     logger.warning(f"failed download product video HTTP {r.status_code}: {vid_src}")
             except Exception as e:
@@ -771,9 +792,21 @@ def process_product_videos(
         elif os.path.isfile(vid_src):
             try:
                 shutil.copy(vid_src, local_vid_path)
-                valid_video_clips.append(local_vid_path)
+                return local_vid_path
             except Exception as e:
                 logger.warning(f"failed to copy product video file {vid_src}: {e}")
+        return None
+
+    logger.info(f"Downloading {len(videos)} product video clips...")
+    with ThreadPoolExecutor(max_workers=min(3, max(1, len(videos)))) as executor:
+        future_map = {
+            executor.submit(_download_single_video, idx, vid_src): idx
+            for idx, vid_src in enumerate(videos)
+        }
+        for future in as_completed(future_map):
+            res = future.result()
+            if res:
+                valid_video_clips.append(res)
 
     logger.info(
         f"processed {len(valid_video_clips)} product video clips for task {task_id}"
@@ -792,20 +825,30 @@ def process_product_visuals(
     """
     Combines product video clips and product image motion clips into P0 Product Visuals.
     """
-    video_clips = process_product_videos(
-        task_id=task_id,
-        videos=videos or [],
-        video_aspect=video_aspect,
-        target_p0_duration=target_p0_duration,
-        clip_duration=clip_duration,
-    )
-    image_clips = process_product_images(
-        task_id=task_id,
-        images=images or [],
-        video_aspect=video_aspect,
-        target_p0_duration=target_p0_duration,
-        clip_duration=clip_duration,
-    )
+    video_clips = []
+    image_clips = []
+    try:
+        video_clips = process_product_videos(
+            task_id=task_id,
+            videos=videos or [],
+            video_aspect=video_aspect,
+            target_p0_duration=target_p0_duration,
+            clip_duration=clip_duration,
+        )
+    except Exception as e:
+        logger.error(f"Error in process_product_videos: {e}", exc_info=True)
+
+    try:
+        image_clips = process_product_images(
+            task_id=task_id,
+            images=images or [],
+            video_aspect=video_aspect,
+            target_p0_duration=target_p0_duration,
+            clip_duration=clip_duration,
+        )
+    except Exception as e:
+        logger.error(f"Error in process_product_images: {e}", exc_info=True)
+
     return video_clips + image_clips
 
 

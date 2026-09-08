@@ -187,7 +187,8 @@ export class VideoProcessor extends WorkerHost {
     }
     const isSubtitleEnabled =
       config.subtitle_enabled !== undefined
-        ? config.subtitle_enabled
+        ? String(config.subtitle_enabled) === 'true' ||
+          config.subtitle_enabled === true
         : settings.subtitle_enabled !== undefined
           ? String(settings.subtitle_enabled) === 'true'
           : true;
