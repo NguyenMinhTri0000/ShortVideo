@@ -19,7 +19,10 @@ export class AuthController {
   }
 
   @Get('me')
-  async getMe(@Headers('x-user-id') headerUserId?: string, @Query('userId') queryUserId?: string) {
+  async getMe(
+    @Headers('x-user-id') headerUserId?: string,
+    @Query('userId') queryUserId?: string,
+  ) {
     const userId = headerUserId || queryUserId;
     if (userId) {
       try {

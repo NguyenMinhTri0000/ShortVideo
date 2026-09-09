@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 
 export class RegisterDto {
@@ -90,7 +95,9 @@ export class AuthService implements OnModuleInit {
       where: { email: dto.email },
     });
     if (existing) {
-      throw new BadRequestException(`User with email ${dto.email} already exists.`);
+      throw new BadRequestException(
+        `User with email ${dto.email} already exists.`,
+      );
     }
 
     return this.prisma.user.create({

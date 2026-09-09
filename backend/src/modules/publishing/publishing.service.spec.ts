@@ -3,6 +3,7 @@ import { PublishingService } from './publishing.service';
 import { PrismaService } from '../database/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { EncryptionService } from './encryption.service';
+import { LlmService } from '../llm/llm.service';
 import { TikTokAdapter } from './adapters/tiktok.adapter';
 import { YouTubeAdapter } from './adapters/youtube.adapter';
 import { InstagramAdapter } from './adapters/instagram.adapter';
@@ -15,6 +16,15 @@ describe('PublishingService', () => {
   let service: PublishingService;
   let prisma: PrismaService;
   let encryptionService: EncryptionService;
+
+  const mockLlmService = {
+    generatePublishingMetadata: jest.fn().mockResolvedValue({
+      title: 'AI Generated Title',
+      caption: 'AI Generated Caption with CTA!',
+      hashtags: ['#viral', '#trending'],
+      hashtagsString: '#viral #trending',
+    }),
+  };
 
   const mockPrismaService = {
     platformAccount: {
@@ -95,6 +105,7 @@ describe('PublishingService', () => {
         EncryptionService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: StorageService, useValue: mockStorageService },
+        { provide: LlmService, useValue: mockLlmService },
         { provide: TikTokAdapter, useValue: mockTikTokAdapter },
         { provide: YouTubeAdapter, useValue: mockYouTubeAdapter },
         { provide: InstagramAdapter, useValue: mockInstagramAdapter },
@@ -114,6 +125,41 @@ describe('PublishingService', () => {
     prisma = module.get<PrismaService>(PrismaService);
     encryptionService = module.get<EncryptionService>(EncryptionService);
     jest.clearAllMocks();
+  });
+
+  describe('generateMetadata', () => {
+    it('should generate metadata using video details when videoId is provided', async () => {
+      mockPrismaService.video.findUnique.mockResolvedValueOnce({
+        id: 'vid-123',
+        title: 'Original Title',
+        script: 'Video script content',
+        idea: { topic: 'Product Review' },
+      });
+
+      const res = await service.generateMetadata({
+        videoId: 'vid-123',
+        tone: 'Viral',
+      });
+
+      expect(mockPrismaService.video.findUnique).toHaveBeenCalledWith({
+        where: { id: 'vid-123' },
+        include: { idea: true },
+      });
+      expect(mockLlmService.generatePublishingMetadata).toHaveBeenCalledWith({
+        videoTitle: 'Original Title',
+        script: 'Video script content',
+        topic: 'Product Review',
+        tone: 'Viral',
+        platform: undefined,
+        language: undefined,
+      });
+      expect(res).toEqual({
+        title: 'AI Generated Title',
+        caption: 'AI Generated Caption with CTA!',
+        hashtags: ['#viral', '#trending'],
+        hashtagsString: '#viral #trending',
+      });
+    });
   });
 
   describe('Account Management & Token Security', () => {
@@ -305,7 +351,13 @@ describe('PublishingService', () => {
 
     it('should filter accounts by userId when specified', async () => {
       mockPrismaService.platformAccount.findMany.mockResolvedValue([
-        { id: 'acc-user1-yt', userId: 'user-1-id', platform: 'YOUTUBE', accountName: 'YouTube 1', status: 'ACTIVE' },
+        {
+          id: 'acc-user1-yt',
+          userId: 'user-1-id',
+          platform: 'YOUTUBE',
+          accountName: 'YouTube 1',
+          status: 'ACTIVE',
+        },
       ]);
 
       const accounts = await service.getAccounts('user-1-id');

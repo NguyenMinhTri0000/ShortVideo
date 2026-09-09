@@ -108,4 +108,30 @@ describe("PublishingDashboard", () => {
       expect(screen.getByText(/Đã tải lên video/i)).toBeInTheDocument();
     });
   });
+
+  it("generates title, caption, and hashtags using AI button", async () => {
+    (api.post as jest.Mock).mockResolvedValueOnce({
+      data: {
+        title: "AI Super Catchy Title",
+        caption: "Awesome caption content!",
+        hashtagsString: "#ai #viral #super",
+      },
+    });
+
+    render(<PublishingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Tạo Tiêu đề, Caption & Hashtags bằng AI/i)).toBeInTheDocument();
+    });
+
+    const generateBtn = screen.getByText(/Tạo Tiêu đề, Caption & Hashtags bằng AI/i);
+    fireEvent.click(generateBtn);
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith("/publishing/generate-metadata", expect.any(Object));
+      expect(screen.getByDisplayValue("AI Super Catchy Title")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Awesome caption content!")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("#ai #viral #super")).toBeInTheDocument();
+    });
+  });
 });

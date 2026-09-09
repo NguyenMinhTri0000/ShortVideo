@@ -17,6 +17,7 @@ import {
   CreateAccountDto,
   CreatePublishJobDto,
   CreateBatchPublishJobsDto,
+  GeneratePublishingMetadataDto,
 } from './publishing.service';
 import { PlatformType } from './adapters/platform-adapter.interface';
 
@@ -187,7 +188,12 @@ export class PublishingController {
     @Query('userId') queryUserId?: string,
   ) {
     const userId = headerUserId || queryUserId;
-    return this.publishingService.listJobs({ platform, status, videoId, userId });
+    return this.publishingService.listJobs({
+      platform,
+      status,
+      videoId,
+      userId,
+    });
   }
 
   @Get('jobs/:id')
@@ -205,5 +211,11 @@ export class PublishingController {
   @HttpCode(HttpStatus.OK)
   async cancelJob(@Param('id') id: string) {
     return this.publishingService.cancelJob(id);
+  }
+
+  @Post('generate-metadata')
+  @HttpCode(HttpStatus.OK)
+  async generateMetadata(@Body() dto: GeneratePublishingMetadataDto) {
+    return this.publishingService.generateMetadata(dto);
   }
 }

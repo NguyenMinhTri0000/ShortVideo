@@ -18,6 +18,22 @@ export type GeneratedIdea = {
   description: string;
 };
 
+export type GeneratePublishingMetadataOptions = {
+  videoTitle?: string;
+  script?: string;
+  topic?: string;
+  tone?: string;
+  platform?: string;
+  language?: string;
+};
+
+export type GeneratedPublishingMetadata = {
+  title: string;
+  caption: string;
+  hashtags: string[];
+  hashtagsString: string;
+};
+
 type GeminiResponse = {
   candidates?: Array<{
     content?: {
@@ -306,6 +322,190 @@ Tiêu đề phải cụ thể, dễ hiểu, không dùng placeholder, không đ�
       );
       throw new Error(
         'Không thể tạo ý tưởng bằng AI. Vui lòng kiểm tra lại API Key và cấu hình LLM.',
+      );
+    }
+  }
+
+  async generatePublishingMetadata(
+    options: GeneratePublishingMetadataOptions = {},
+  ): Promise<GeneratedPublishingMetadata> {
+    const { provider, apiKey, model } = await this.getActiveProviderConfig();
+
+    if (!apiKey) {
+      this.logger.warn(
+        `LLM API key is missing for provider "${provider}". Rejecting metadata generation request.`,
+      );
+      throw new BadRequestException(
+        'Chưa cấu hình API key cho AI provider hiện tại. Vào Cài đặt để bật tính năng AI.',
+      );
+    }
+
+    const videoTitle = options.videoTitle?.trim() || '';
+    const script = options.script?.trim() || '';
+    const topic = options.topic?.trim() || '';
+    const tone = options.tone?.trim() || 'Hấp dẫn & Viral';
+    const platform = options.platform?.trim() || 'Tất cả nền tảng';
+    const language = options.language === 'en' ? 'Tiếng Anh' : 'Tiếng Việt';
+
+    const prompt = `Bạn là chuyên gia marketing và tối ưu hóa nội dung video ngắn (TikTok, YouTube Shorts, Instagram Reels, Facebook Reels).
+Hãy tạo Tiêu đề (title), Mô tả/Caption, và Danh sách Hashtags cho video ngắn dựa trên thông tin:
+- Tiêu đề gốc/Tên video: "${videoTitle || 'N/A'}"
+- Chủ đề/Chi tiết: "${topic || 'N/A'}"
+- Kịch bản/Nội dung video: "${script || 'N/A'}"
+- Phong cách (Tone): "${tone}"
+- Nền tảng: "${platform}"
+- Ngôn ngữ: ${language}
+
+Yêu cầu trả về kết quả dưới dạng JSON Object thuần túy, KHÔNG có markdown, KHÔNG có thẻ \`\`\`json. Cấu trúc JSON:
+{
+  "title": "Tiêu đề gây chú ý, ngắn gọn, kích thích người xem click (dưới 70 ký tự)",
+  "caption": "Mô tả hấp dẫn, nêu bật điểm thú vị/giá trị video, kèm câu kêu gọi tương tác CTA",
+  "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"]
+}`;
+
+    try {
+      let resultText = '';
+
+      const openAIBaseUrl = (): string => {
+        const urls: Record<string, string> = {
+          groq: 'https://api.groq.com/openai/v1/chat/completions',
+          openai: 'https://api.openai.com/v1/chat/completions',
+          deepseek: 'https://api.deepseek.com/v1/chat/completions',
+          moonshot: 'https://api.moonshot.cn/v1/chat/completions',
+          qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+          grok: 'https://api.x.ai/v1/chat/completions',
+          volcengine:
+            'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+        };
+        return urls[provider] || '';
+      };
+
+      const defaultModel = (): string => {
+        const models: Record<string, string> = {
+          groq: 'llama-3.3-70b-versatile',
+          openai: 'gpt-4o-mini',
+          deepseek: 'deepseek-chat',
+          moonshot: 'moonshot-v1-8k',
+          qwen: 'qwen-max',
+          azure: 'gpt-35-turbo',
+          grok: 'grok-4.3',
+          volcengine: 'doubao-seed-2-1-turbo-260628',
+        };
+        return models[provider] || '';
+      };
+
+      if (provider === 'gemini') {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+        });
+        if (!response.ok) {
+          throw new Error(
+            `Gemini API returned ${response.status}: ${await response.text()}`,
+          );
+        }
+        const data = (await response.json()) as GeminiResponse;
+        resultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      } else if (provider === 'azure') {
+        const baseUrl = await this.getSetting('azure_base_url', '');
+        const url = `${baseUrl}/openai/deployments/${model}/chat/completions?api-version=2024-08-01-preview`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'api-key': apiKey,
+          },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+          }),
+        });
+        if (!response.ok) {
+          throw new Error(
+            `Azure OpenAI API returned ${response.status}: ${await response.text()}`,
+          );
+        }
+        const data = (await response.json()) as OpenAICompatibleResponse;
+        resultText = data.choices?.[0]?.message?.content || '';
+      } else {
+        const url = openAIBaseUrl();
+        if (!url) {
+          throw new Error(`Unsupported LLM provider: ${provider}`);
+        }
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: model || defaultModel(),
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+          }),
+        });
+        if (!response.ok) {
+          throw new Error(
+            `${provider} API returned ${response.status}: ${await response.text()}`,
+          );
+        }
+        const data = (await response.json()) as OpenAICompatibleResponse;
+        resultText = data.choices?.[0]?.message?.content || '';
+      }
+
+      if (!resultText) {
+        throw new Error('LLM returned empty response');
+      }
+
+      const cleanJson = resultText
+        .replace(/```json/g, '')
+        .replace(/```/g, '')
+        .trim();
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(cleanJson);
+      } catch (e) {
+        const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error('LLM output format error');
+        }
+      }
+
+      const genTitle = parsed.title || videoTitle || 'Short Video';
+      const genCaption = parsed.caption || 'Xem ngay video độc đáo này!';
+      const rawTags = Array.isArray(parsed.hashtags)
+        ? parsed.hashtags
+        : ['affiliate', 'review', 'trending'];
+
+      const hashtagsArray: string[] = rawTags.map((tag: string) => {
+        const clean = String(tag).trim().replace(/^#+/, '');
+        return `#${clean}`;
+      });
+
+      const hashtagsString = hashtagsArray.join(' ');
+
+      return {
+        title: genTitle,
+        caption: genCaption,
+        hashtags: hashtagsArray,
+        hashtagsString,
+      };
+    } catch (error: unknown) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to generate publishing metadata using LLM: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new BadRequestException(
+        'Không thể tạo nội dung video bằng AI. Vui lòng kiểm tra lại API Key hoặc cấu hình LLM.',
       );
     }
   }

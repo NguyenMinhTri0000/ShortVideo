@@ -8,8 +8,18 @@ describe('AuthService & Multi-User Isolation', () => {
   let prisma: PrismaService;
 
   const mockUsers = [
-    { id: 'user-1-id', email: 'user1@example.com', name: 'Tài khoản 1', role: 'USER' },
-    { id: 'user-2-id', email: 'user2@example.com', name: 'Tài khoản 2', role: 'USER' },
+    {
+      id: 'user-1-id',
+      email: 'user1@example.com',
+      name: 'Tài khoản 1',
+      role: 'USER',
+    },
+    {
+      id: 'user-2-id',
+      email: 'user2@example.com',
+      name: 'Tài khoản 2',
+      role: 'USER',
+    },
   ];
 
   const mockPrismaService = {
@@ -19,10 +29,14 @@ describe('AuthService & Multi-User Isolation', () => {
       findMany: jest.fn().mockResolvedValue(mockUsers),
       findUnique: jest.fn().mockImplementation(({ where }) => {
         if (where.id) {
-          return Promise.resolve(mockUsers.find((u) => u.id === where.id) || null);
+          return Promise.resolve(
+            mockUsers.find((u) => u.id === where.id) || null,
+          );
         }
         if (where.email) {
-          return Promise.resolve(mockUsers.find((u) => u.email === where.email) || null);
+          return Promise.resolve(
+            mockUsers.find((u) => u.email === where.email) || null,
+          );
         }
         return Promise.resolve(null);
       }),
@@ -69,7 +83,9 @@ describe('AuthService & Multi-User Isolation', () => {
   });
 
   it('should throw NotFoundException for non-existent user ID', async () => {
-    await expect(service.getUserById('non-existent')).rejects.toThrow(NotFoundException);
+    await expect(service.getUserById('non-existent')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('should register a new user', async () => {

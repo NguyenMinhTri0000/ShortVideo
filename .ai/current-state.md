@@ -31,6 +31,7 @@
   - `TASK-018`: Implement multi-user authentication and per-user platform account isolation (`.ai/tasks/TASK-018-multi-user-platform-account-isolation.md`)
   - `TASK-019`: Fix connected platform account UI filtering and accountId generation fallback (`.ai/tasks/TASK-019-fix-connected-account-ui-filtering.md`)
   - `TASK-020`: Add account deletion controls to Target Platforms & Accounts UI (`.ai/tasks/TASK-020-add-account-deletion-controls.md`)
+  - `TASK-021`: AI Video Publishing Metadata Generator (Title, Caption, Hashtags) in Create Publishing Job (`.ai/tasks/TASK-021-generate-video-publishing-metadata.md`)
 - **Blocked Tasks**: None
 - **Next Recommended Task**: `TASK-002`: Clean up existing ESLint technical debt (`.ai/tasks/TASK-002-cleanup-eslint-tech-debt.md`)
 

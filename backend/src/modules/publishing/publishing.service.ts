@@ -10,6 +10,7 @@ import { Queue } from 'bullmq';
 import { PrismaService } from '../database/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { EncryptionService } from './encryption.service';
+import { LlmService } from '../llm/llm.service';
 import { TikTokAdapter } from './adapters/tiktok.adapter';
 import { YouTubeAdapter } from './adapters/youtube.adapter';
 import { InstagramAdapter } from './adapters/instagram.adapter';
@@ -54,6 +55,36 @@ export class CreateAccountDto {
 
   @IsOptional()
   metadata?: Record<string, any>;
+}
+
+export class GeneratePublishingMetadataDto {
+  @IsOptional()
+  @IsString()
+  videoId?: string;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  script?: string;
+
+  @IsOptional()
+  @IsString()
+  topic?: string;
+
+  @IsOptional()
+  @IsString()
+  tone?: string;
+
+  @IsOptional()
+  @IsString()
+  platform?: string;
+
+  @IsOptional()
+  @IsString()
+  language?: string;
 }
 
 export class CreatePublishJobDto {
@@ -146,6 +177,7 @@ export class PublishingService {
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly encryptionService: EncryptionService,
+    private readonly llmService: LlmService,
     private readonly tiktokAdapter: TikTokAdapter,
     private readonly youtubeAdapter: YouTubeAdapter,
     private readonly instagramAdapter: InstagramAdapter,
@@ -165,6 +197,44 @@ export class PublishingService {
       throw new BadRequestException(`Unsupported platform: ${platform}`);
     }
     return adapter;
+  }
+
+  async generateMetadata(dto: GeneratePublishingMetadataDto) {
+    let videoTitle = dto.title || '';
+    let script = dto.script || '';
+    let topic = dto.topic || '';
+
+    if (dto.videoId) {
+      try {
+        const video = await this.prisma.video.findUnique({
+          where: { id: dto.videoId },
+          include: { idea: true },
+        });
+        if (video) {
+          if (!videoTitle) videoTitle = video.title || '';
+          if (!script)
+            script =
+              video.script ||
+              video.idea?.script ||
+              video.idea?.description ||
+              '';
+          if (!topic) topic = video.idea?.topic || '';
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Could not fetch video details for metadata generation: ${err}`,
+        );
+      }
+    }
+
+    return this.llmService.generatePublishingMetadata({
+      videoTitle,
+      script,
+      topic,
+      tone: dto.tone,
+      platform: dto.platform,
+      language: dto.language,
+    });
   }
 
   // --- ACCOUNTS MANAGEMENT ---
@@ -255,7 +325,11 @@ export class PublishingService {
     });
   }
 
-  async getOAuthUrl(platform: PlatformType, redirectUri: string, userId?: string) {
+  async getOAuthUrl(
+    platform: PlatformType,
+    redirectUri: string,
+    userId?: string,
+  ) {
     const adapter = this.getAdapter(platform);
     if (!adapter.isConfigured()) {
       const missingKeys = adapter.getMissingConfig
@@ -273,7 +347,9 @@ export class PublishingService {
     if (!adapter.getAuthUrl) {
       throw new BadRequestException(`OAuth not supported for ${platform}`);
     }
-    const state = userId ? `${platform.toLowerCase()}_auth_${userId}` : `${platform.toLowerCase()}_auth`;
+    const state = userId
+      ? `${platform.toLowerCase()}_auth_${userId}`
+      : `${platform.toLowerCase()}_auth`;
     return adapter.getAuthUrl(redirectUri, state);
   }
 
@@ -309,16 +385,19 @@ export class PublishingService {
       );
     }
 
-    return this.createAccount({
-      userId: targetUserId,
-      platform,
-      accountName: tokenResult.accountName || `${platform} Account`,
-      accountId: tokenResult.accountId,
-      accessToken: tokenResult.accessToken,
-      refreshToken: tokenResult.refreshToken,
-      tokenExpiresAt: tokenResult.expiresAt,
-      metadata: tokenResult.metadata,
-    }, targetUserId);
+    return this.createAccount(
+      {
+        userId: targetUserId,
+        platform,
+        accountName: tokenResult.accountName || `${platform} Account`,
+        accountId: tokenResult.accountId,
+        accessToken: tokenResult.accessToken,
+        refreshToken: tokenResult.refreshToken,
+        tokenExpiresAt: tokenResult.expiresAt,
+        metadata: tokenResult.metadata,
+      },
+      targetUserId,
+    );
   }
 
   // --- PUBLISHING JOBS ---

@@ -21,6 +21,7 @@ import {
   Film,
   FileVideo,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 
 interface PlatformAccount {
@@ -86,6 +87,42 @@ export default function PublishingDashboard() {
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
+
+  // AI Metadata Generator State
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiTone, setAiTone] = useState("Hấp dẫn & Viral");
+  const [aiPrompt, setAiPrompt] = useState("");
+
+  const handleGenerateAiMetadata = async () => {
+    setAiGenerating(true);
+    try {
+      const selectedVid = videos.find((v) => v.id === selectedVideoId);
+      const res = await api.post("/publishing/generate-metadata", {
+        videoId: selectedVideoId || undefined,
+        title: selectedVid?.title || title || undefined,
+        topic: aiPrompt || undefined,
+        tone: aiTone,
+      });
+
+      if (res.data) {
+        if (res.data.title) setTitle(res.data.title);
+        if (res.data.caption) setCaption(res.data.caption);
+        if (res.data.hashtagsString) setHashtags(res.data.hashtagsString);
+
+        setActionMessage({
+          type: "success",
+          text: "Đã tạo thành công Tiêu đề, Caption và Hashtags bằng AI!",
+        });
+      }
+    } catch (err: any) {
+      setActionMessage({
+        type: "error",
+        text: err.response?.data?.message || "Tạo nội dung bằng AI thất bại. Vui lòng kiểm tra lại API Key.",
+      });
+    } finally {
+      setAiGenerating(false);
+    }
+  };
 
   // Connect Modal / Manual Account State
   const [showConnectModal, setShowConnectModal] = useState(false);
@@ -708,6 +745,64 @@ export default function PublishingDashboard() {
 
             {/* Right Column: Metadata & Schedule Settings */}
             <div className="space-y-4">
+              {/* AI Metadata Generator Box */}
+              <div className="bg-gradient-to-r from-violet-950/40 via-indigo-950/40 to-purple-950/40 border border-violet-800/40 rounded-xl p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-violet-400 animate-pulse" />
+                    <span className="text-xs font-semibold text-violet-200">✨ AI Generate Title, Caption & Hashtags</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-400 font-mono">AI Generator</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-medium text-zinc-400 mb-1">Phong cách (Tone)</label>
+                    <select
+                      value={aiTone}
+                      onChange={(e) => setAiTone(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+                    >
+                      <option value="Hấp dẫn & Viral">🔥 Hấp dẫn & Viral</option>
+                      <option value="Bán hàng & Khuyến mãi">🛍️ Bán hàng & Ưu đãi</option>
+                      <option value="Chuyên nghiệp & Tin cậy">⭐ Chuyên nghiệp</option>
+                      <option value="Hài hước & Vui vẻ">😂 Hài hước & Vui vẻ</option>
+                      <option value="Kể chuyện & Cảm xúc">📖 Kể chuyện & Cảm xúc</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-medium text-zinc-400 mb-1">Gợi ý thêm (Tùy chọn)</label>
+                    <input
+                      type="text"
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      placeholder="Ví dụ: Ưu đãi 50%, hàng mới..."
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGenerateAiMetadata}
+                  disabled={aiGenerating}
+                  className="w-full flex items-center justify-center gap-2 font-semibold text-xs py-2 px-3 rounded-lg bg-violet-600 hover:bg-violet-500 text-white shadow-md shadow-violet-600/20 disabled:opacity-50 transition"
+                >
+                  {aiGenerating ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Đang dùng AI tạo nội dung...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Tạo Tiêu đề, Caption & Hashtags bằng AI</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
                   Post Title

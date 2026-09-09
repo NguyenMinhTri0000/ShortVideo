@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { DatabaseModule } from '../database/database.module';
 import { StorageModule } from '../storage/storage.module';
+import { LlmModule } from '../llm/llm.module';
 import { EncryptionService } from './encryption.service';
 import { PublishingService } from './publishing.service';
 import { PublishingController } from './publishing.controller';
@@ -15,6 +16,7 @@ import { FacebookAdapter } from './adapters/facebook.adapter';
   imports: [
     DatabaseModule,
     StorageModule,
+    LlmModule,
     BullModule.registerQueue(
       { name: 'publishing-queue' },
       { name: 'analytics-queue' },
