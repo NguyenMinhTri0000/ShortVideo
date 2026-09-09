@@ -430,7 +430,7 @@ export default function PublishingDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {(["TIKTOK", "YOUTUBE", "INSTAGRAM", "FACEBOOK"] as const).map((plat) => {
             const accList = accounts.filter(
-              (a) => a.platform === plat && a.status === "ACTIVE" && a.accountId && !["facebook_page", "instagram_account", "tiktok_user", "youtube_channel"].includes(a.accountId),
+              (a) => a.platform === plat && a.status === "ACTIVE",
             );
             const hasConnected = accList.length > 0;
             const isApiConfigured = platformConfig[plat]?.isConfigured ?? false;
@@ -687,6 +687,17 @@ export default function PublishingDashboard() {
                               </span>
                             </div>
                           </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteAccount(acc.id);
+                            }}
+                            className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-800/40 transition"
+                            title="Xóa tài khoản này"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       );
                     })}

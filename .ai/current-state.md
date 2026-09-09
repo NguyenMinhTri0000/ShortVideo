@@ -9,7 +9,7 @@
 
 ## Task Execution Overview
 
-- **Active Task**: `TASK-019`: Fix connected platform account UI filtering and accountId generation fallback (`.ai/tasks/TASK-019-fix-connected-account-ui-filtering.md`)
+- **Active Task**: None
 - **Completed Tasks**:
   - `TASK-000`: Setup Repository Structure & AI Memory (`.ai/`)
   - `TASK-001`: Verify Autonomous Development Workflow Setup (`.ai/tasks/TASK-001-setup-verification.md`)
@@ -29,6 +29,8 @@
   - `TASK-016`: Fix Product Visual Processing Hang and Optimize Motion Clip Rendering Performance (`.ai/tasks/TASK-016-fix-product-visuals-hanging-and-performance.md`)
   - `TASK-017`: Fix missing Pexels/Pixabay API key crash and ensure complete video generation (`.ai/tasks/TASK-017-fix-missing-pexels-api-key-and-complete-video-generation.md`)
   - `TASK-018`: Implement multi-user authentication and per-user platform account isolation (`.ai/tasks/TASK-018-multi-user-platform-account-isolation.md`)
+  - `TASK-019`: Fix connected platform account UI filtering and accountId generation fallback (`.ai/tasks/TASK-019-fix-connected-account-ui-filtering.md`)
+  - `TASK-020`: Add account deletion controls to Target Platforms & Accounts UI (`.ai/tasks/TASK-020-add-account-deletion-controls.md`)
 - **Blocked Tasks**: None
 - **Next Recommended Task**: `TASK-002`: Clean up existing ESLint technical debt (`.ai/tasks/TASK-002-cleanup-eslint-tech-debt.md`)
 
