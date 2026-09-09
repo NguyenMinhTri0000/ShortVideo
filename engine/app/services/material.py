@@ -63,17 +63,18 @@ def search_videos_pexels(
     aspect = VideoAspect(video_aspect)
     video_orientation = aspect.name
     video_width, video_height = aspect.to_resolution()
-    api_key = get_api_key("pexels_api_keys")
-    headers = {
-        "Authorization": api_key,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-    }
-    # Build URL
-    params = {"query": search_term, "per_page": 20, "orientation": video_orientation}
-    query_url = f"https://api.pexels.com/videos/search?{urlencode(params)}"
-    logger.info(f"searching videos: {query_url}, with proxies: {config.proxy}")
 
     try:
+        api_key = get_api_key("pexels_api_keys")
+        headers = {
+            "Authorization": api_key,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+        }
+        # Build URL
+        params = {"query": search_term, "per_page": 20, "orientation": video_orientation}
+        query_url = f"https://api.pexels.com/videos/search?{urlencode(params)}"
+        logger.info(f"searching videos: {query_url}, with proxies: {config.proxy}")
+
         r = requests.get(
             query_url,
             headers=headers,
@@ -106,6 +107,9 @@ def search_videos_pexels(
                     video_items.append(item)
                     break
         return video_items
+    except ValueError as e:
+        logger.warning(f"Pexels API key not configured: {str(e).strip()}")
+        return []
     except Exception as e:
         logger.error(f"search videos failed: {str(e)}")
 
@@ -121,18 +125,18 @@ def search_videos_pixabay(
 
     video_width, video_height = aspect.to_resolution()
 
-    api_key = get_api_key("pixabay_api_keys")
-    # Build URL
-    params = {
-        "q": search_term,
-        "video_type": "all",  # Accepted values: "all", "film", "animation"
-        "per_page": 50,
-        "key": api_key,
-    }
-    query_url = f"https://pixabay.com/api/videos/?{urlencode(params)}"
-    logger.info(f"searching videos: {query_url}, with proxies: {config.proxy}")
-
     try:
+        api_key = get_api_key("pixabay_api_keys")
+        # Build URL
+        params = {
+            "q": search_term,
+            "video_type": "all",  # Accepted values: "all", "film", "animation"
+            "per_page": 50,
+            "key": api_key,
+        }
+        query_url = f"https://pixabay.com/api/videos/?{urlencode(params)}"
+        logger.info(f"searching videos: {query_url}, with proxies: {config.proxy}")
+
         r = requests.get(
             query_url, proxies=config.proxy, verify=_get_tls_verify(), timeout=(30, 60)
         )
@@ -162,6 +166,9 @@ def search_videos_pixabay(
                     video_items.append(item)
                     break
         return video_items
+    except ValueError as e:
+        logger.warning(f"Pixabay API key not configured: {str(e).strip()}")
+        return []
     except Exception as e:
         logger.error(f"search videos failed: {str(e)}")
 
@@ -192,18 +199,18 @@ def search_videos_coverr(
     GET 这个 URL 本身就被 Coverr 当作一次合法的 download 事件计入统计,
     无需再调用 PATCH /videos/:id/stats/downloads。
     """
-    api_key = get_api_key("coverr_api_keys")
-    headers = {"Authorization": f"Bearer {api_key}"}
-    params = {
-        "query": search_term,
-        "page_size": 20,
-        "urls": "true",
-        "sort": "popular",
-    }
-    query_url = f"https://api.coverr.co/videos?{urlencode(params)}"
-    logger.info(f"searching videos: {query_url}, with proxies: {config.proxy}")
-
     try:
+        api_key = get_api_key("coverr_api_keys")
+        headers = {"Authorization": f"Bearer {api_key}"}
+        params = {
+            "query": search_term,
+            "page_size": 20,
+            "urls": "true",
+            "sort": "popular",
+        }
+        query_url = f"https://api.coverr.co/videos?{urlencode(params)}"
+        logger.info(f"searching videos: {query_url}, with proxies: {config.proxy}")
+
         r = requests.get(
             query_url,
             headers=headers,
@@ -238,6 +245,9 @@ def search_videos_coverr(
             item.duration = duration
             video_items.append(item)
         return video_items
+    except ValueError as e:
+        logger.warning(f"Coverr API key not configured: {str(e).strip()}")
+        return []
     except Exception as e:
         logger.error(f"search videos failed: {str(e)}")
 

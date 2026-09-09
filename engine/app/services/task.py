@@ -86,8 +86,13 @@ def save_script_data(task_id, video_script, video_terms, params):
         "params": params,
     }
 
-    with open(script_file, "w", encoding="utf-8") as f:
-        f.write(utils.to_json(script_data))
+    try:
+        with open(script_file, "w", encoding="utf-8") as f:
+            f.write(utils.to_json(script_data))
+    except PermissionError as e:
+        logger.warning(f"Permission error writing {script_file}: {e}")
+    except Exception as e:
+        logger.error(f"Failed to write script data to {script_file}: {e}")
 
 
 def resolve_custom_audio_file(task_id: str, custom_audio_file: str | None) -> str:

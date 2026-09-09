@@ -27,6 +27,7 @@
   - `TASK-014`: Add feature to enable/disable subtitle generation step in video creation pipeline (`.ai/tasks/TASK-014-enable-disable-subtitle-step.md`)
   - `TASK-015`: Fix Gemini 404 model error and stuck material download loop (`.ai/tasks/TASK-015-fix-gemini-404-model-error-and-stuck-material-download.md`)
   - `TASK-016`: Fix Product Visual Processing Hang and Optimize Motion Clip Rendering Performance (`.ai/tasks/TASK-016-fix-product-visuals-hanging-and-performance.md`)
+  - `TASK-017`: Fix missing Pexels/Pixabay API key crash and ensure complete video generation (`.ai/tasks/TASK-017-fix-missing-pexels-api-key-and-complete-video-generation.md`)
 - **Blocked Tasks**: None
 - **Next Recommended Task**: `TASK-002`: Clean up existing ESLint technical debt (`.ai/tasks/TASK-002-cleanup-eslint-tech-debt.md`)
 
