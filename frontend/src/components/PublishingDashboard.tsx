@@ -92,6 +92,8 @@ export default function PublishingDashboard() {
   const [connectPlatform, setConnectPlatform] = useState<"TIKTOK" | "YOUTUBE" | "INSTAGRAM" | "FACEBOOK">("TIKTOK");
   const [manualAccountName, setManualAccountName] = useState("");
   const [manualAccessToken, setManualAccessToken] = useState("");
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [modalLoading, setModalLoading] = useState(false);
   const [platformConfig, setPlatformConfig] = useState<Record<string, { isConfigured: boolean; missing: string[] }>>({});
 
   const handleUploadFile = async (file: File) => {
@@ -181,7 +183,12 @@ export default function PublishingDashboard() {
   useEffect(() => {
     fetchData();
 
+    const handleUserChanged = () => {
+      fetchData();
+    };
+
     if (typeof window !== "undefined") {
+      window.addEventListener("active_user_changed", handleUserChanged);
       const params = new URLSearchParams(window.location.search);
       const connectedId = params.get("accountConnected");
       const errorParam = params.get("error");
@@ -193,6 +200,12 @@ export default function PublishingDashboard() {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("active_user_changed", handleUserChanged);
+      }
+    };
   }, []);
 
   const handleVideoSelect = (vidId: string) => {
@@ -261,6 +274,8 @@ export default function PublishingDashboard() {
 
   const handleConnectManualAccount = async (e: React.FormEvent) => {
     e.preventDefault();
+    setModalError(null);
+    setModalLoading(true);
     try {
       await api.post("/publishing/accounts", {
         platform: connectPlatform,
@@ -273,24 +288,36 @@ export default function PublishingDashboard() {
       setActionMessage({ type: "success", text: `Connected ${connectPlatform} account successfully.` });
       fetchData();
     } catch (err: any) {
-      setActionMessage({ type: "error", text: err.response?.data?.message || "Failed to connect account." });
+      const msg = err.response?.data?.message || "Failed to connect account.";
+      setModalError(msg);
+      setActionMessage({ type: "error", text: msg });
+    } finally {
+      setModalLoading(false);
     }
   };
 
   const handleStartOAuth = async (targetPlatform?: "TIKTOK" | "YOUTUBE" | "INSTAGRAM" | "FACEBOOK") => {
     const plat = targetPlatform || connectPlatform;
+    setModalError(null);
+    setModalLoading(true);
     try {
       const res = await api.get(`/publishing/accounts/${plat.toLowerCase()}/connect`);
       if (res.data?.url) {
         window.location.href = res.data.url;
       } else {
-        setActionMessage({ type: "error", text: "Could not retrieve OAuth authorization URL." });
+        const msg = "Could not retrieve OAuth authorization URL.";
+        setModalError(msg);
+        setActionMessage({ type: "error", text: msg });
       }
     } catch (err: any) {
+      const msg = err.response?.data?.message || `OAuth connect failed for ${plat}. Ensure API keys are configured.`;
+      setModalError(msg);
       setActionMessage({
         type: "error",
-        text: err.response?.data?.message || `OAuth connect failed for ${plat}. Ensure API keys are configured.`,
+        text: msg,
       });
+    } finally {
+      setModalLoading(false);
     }
   };
 
@@ -985,14 +1012,32 @@ export default function PublishingDashboard() {
                 </div>
               )}
 
+              {modalError && (
+                <div className="bg-rose-950/60 border border-rose-800/80 rounded-lg p-3 text-xs text-rose-200 flex items-start gap-2.5 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-rose-300">Thông báo từ hệ thống OAuth</p>
+                    <p className="text-[11px] text-rose-200/90 leading-relaxed">{modalError}</p>
+                    <p className="text-[10px] text-rose-300/80 pt-0.5">
+                      💡 Gợi ý: Hãy nhập Tên kênh ở mục <strong>Or Manual Entry</strong> bên dưới và nhấn <strong>Save Account</strong> để kết nối kênh trực tiếp cho tài khoản này.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-violet-950/40 border border-violet-800/40 rounded-lg p-3 space-y-2">
                 <p className="text-xs text-violet-200 font-medium">Automatic Connection via OAuth 2.0 (Recommended)</p>
                 <button
                   type="button"
+                  disabled={modalLoading}
                   onClick={() => handleStartOAuth()}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs transition shadow-md"
+                  className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold text-xs transition shadow-md"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  {modalLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  )}
                   Sign in & Connect {connectPlatform} Account
                 </button>
               </div>
@@ -1010,7 +1055,7 @@ export default function PublishingDashboard() {
                   required
                   value={manualAccountName}
                   onChange={(e) => setManualAccountName(e.target.value)}
-                  placeholder="e.g. My TikTok Channel"
+                  placeholder="e.g. Kênh YouTube 1"
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
                 />
               </div>
@@ -1034,15 +1079,20 @@ export default function PublishingDashboard() {
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowConnectModal(false)}
+                  onClick={() => {
+                    setShowConnectModal(false);
+                    setModalError(null);
+                  }}
                   className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-xs text-white font-semibold"
+                  disabled={modalLoading}
+                  className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-xs text-white font-semibold flex items-center gap-1.5"
                 >
+                  {modalLoading && <Loader2 className="w-3 h-3 animate-spin" />}
                   Save Account
                 </button>
               </div>

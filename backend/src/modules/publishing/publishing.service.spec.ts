@@ -21,6 +21,7 @@ describe('PublishingService', () => {
       create: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       delete: jest.fn(),
     },
     video: {
@@ -297,6 +298,59 @@ describe('PublishingService', () => {
           data: expect.objectContaining({
             platform: 'FACEBOOK',
             accountId: 'real_page_id_999',
+          }),
+        }),
+      );
+    });
+
+    it('should filter accounts by userId when specified', async () => {
+      mockPrismaService.platformAccount.findMany.mockResolvedValue([
+        { id: 'acc-user1-yt', userId: 'user-1-id', platform: 'YOUTUBE', accountName: 'YouTube 1', status: 'ACTIVE' },
+      ]);
+
+      const accounts = await service.getAccounts('user-1-id');
+      expect(mockPrismaService.platformAccount.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1-id' },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(accounts).toHaveLength(1);
+      expect(accounts[0].accountName).toBe('YouTube 1');
+    });
+
+    it('should associate userId when creating platform account for User 2', async () => {
+      mockPrismaService.platformAccount.create.mockResolvedValue({
+        id: 'acc-user2-tt',
+        userId: 'user-2-id',
+        platform: 'TIKTOK',
+        accountName: 'TikTok 2',
+        status: 'ACTIVE',
+      });
+
+      const account = await service.createAccount({
+        platform: 'TIKTOK',
+        accountName: 'TikTok 2',
+        userId: 'user-2-id',
+      });
+
+      expect(account.id).toBe('acc-user2-tt');
+      expect(mockPrismaService.platformAccount.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: 'user-2-id',
+            platform: 'TIKTOK',
+            accountName: 'TikTok 2',
+          }),
+        }),
+      );
+    });
+
+    it('should filter publish jobs by userId', async () => {
+      mockPrismaService.publishJob.findMany.mockResolvedValue([]);
+      await service.listJobs({ userId: 'user-1-id' });
+      expect(mockPrismaService.publishJob.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            platformAccount: { userId: 'user-1-id' },
           }),
         }),
       );

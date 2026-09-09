@@ -6,6 +6,7 @@ import {
   Body,
   Param,
   Query,
+  Headers,
   HttpCode,
   HttpStatus,
   Res,
@@ -67,18 +68,31 @@ export class PublishingController {
   }
 
   @Get('accounts')
-  async getAccounts() {
-    return this.publishingService.getAccounts();
+  async getAccounts(
+    @Headers('x-user-id') headerUserId?: string,
+    @Query('userId') queryUserId?: string,
+  ) {
+    const userId = headerUserId || queryUserId;
+    return this.publishingService.getAccounts(userId);
   }
 
   @Post('accounts')
-  async createAccount(@Body() dto: CreateAccountDto) {
-    return this.publishingService.createAccount(dto);
+  async createAccount(
+    @Body() dto: CreateAccountDto,
+    @Headers('x-user-id') headerUserId?: string,
+  ) {
+    const userId = dto.userId || headerUserId;
+    return this.publishingService.createAccount(dto, userId);
   }
 
   @Delete('accounts/:id')
-  async deleteAccount(@Param('id') id: string) {
-    return this.publishingService.deleteAccount(id);
+  async deleteAccount(
+    @Param('id') id: string,
+    @Headers('x-user-id') headerUserId?: string,
+    @Query('userId') queryUserId?: string,
+  ) {
+    const userId = headerUserId || queryUserId;
+    return this.publishingService.deleteAccount(id, userId);
   }
 
   private getDefaultRedirect(platform: string): string {
@@ -97,12 +111,16 @@ export class PublishingController {
   async getConnectUrl(
     @Param('platform') platform: string,
     @Query('redirectUri') redirectUri: string,
+    @Headers('x-user-id') headerUserId?: string,
+    @Query('userId') queryUserId?: string,
   ) {
     const plat = platform.toUpperCase() as PlatformType;
     const defaultRedirect = this.getDefaultRedirect(platform);
+    const userId = headerUserId || queryUserId;
     return this.publishingService.getOAuthUrl(
       plat,
       redirectUri || defaultRedirect,
+      userId,
     );
   }
 
@@ -111,7 +129,10 @@ export class PublishingController {
     @Param('platform') platform: string,
     @Query('code') code: string,
     @Query('redirectUri') redirectUri: string,
-    @Res() res: Response,
+    @Query('state') state: string,
+    @Headers('x-user-id') headerUserId?: string,
+    @Query('userId') queryUserId?: string,
+    @Res() res?: Response,
   ) {
     const frontendUrl =
       process.env.FRONTEND_URL ||
@@ -120,19 +141,28 @@ export class PublishingController {
     try {
       const plat = platform.toUpperCase() as PlatformType;
       const defaultRedirect = this.getDefaultRedirect(platform);
+      const userId = headerUserId || queryUserId;
       const account = await this.publishingService.handleOAuthCallback(
         plat,
         code,
         redirectUri || defaultRedirect,
+        userId,
+        state,
       );
-      return res.redirect(
-        `${frontendUrl}/publishing?accountConnected=${account.id}`,
-      );
+      if (res) {
+        return res.redirect(
+          `${frontendUrl}/publishing?accountConnected=${account.id}`,
+        );
+      }
+      return account;
     } catch (err: any) {
       const errorMessage = encodeURIComponent(
         err.message || 'OAuth authorization failed.',
       );
-      return res.redirect(`${frontendUrl}/publishing?error=${errorMessage}`);
+      if (res) {
+        return res.redirect(`${frontendUrl}/publishing?error=${errorMessage}`);
+      }
+      throw err;
     }
   }
 
@@ -153,8 +183,11 @@ export class PublishingController {
     @Query('platform') platform?: string,
     @Query('status') status?: string,
     @Query('videoId') videoId?: string,
+    @Headers('x-user-id') headerUserId?: string,
+    @Query('userId') queryUserId?: string,
   ) {
-    return this.publishingService.listJobs({ platform, status, videoId });
+    const userId = headerUserId || queryUserId;
+    return this.publishingService.listJobs({ platform, status, videoId, userId });
   }
 
   @Get('jobs/:id')

@@ -35,6 +35,10 @@ export class CreateAccountDto {
 
   @IsOptional()
   @IsString()
+  userId?: string;
+
+  @IsOptional()
+  @IsString()
   accountId?: string;
 
   @IsOptional()
@@ -177,7 +181,7 @@ export class PublishingService {
     return status;
   }
 
-  async createAccount(dto: CreateAccountDto) {
+  async createAccount(dto: CreateAccountDto, targetUserId?: string) {
     const encryptedAccess = this.encryptionService.encrypt(dto.accessToken);
     const encryptedRefresh = this.encryptionService.encrypt(dto.refreshToken);
 
@@ -185,14 +189,18 @@ export class PublishingService {
       dto.platform.toUpperCase() as PlatformType,
     ).isConfigured();
     const hasToken = Boolean(dto.accessToken && dto.accessToken.trim());
-    const status =
-      hasToken || isAdapterConfigured ? 'ACTIVE' : 'NOT_CONFIGURED';
+    const status = 'ACTIVE';
+
+    const accountId =
+      dto.accountId ||
+      `${dto.platform.toLowerCase()}_acc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
     const account = await this.prisma.platformAccount.create({
       data: {
+        userId: dto.userId || targetUserId || null,
         platform: dto.platform,
         accountName: dto.accountName,
-        accountId: dto.accountId,
+        accountId,
         accessToken: encryptedAccess,
         refreshToken: encryptedRefresh,
         tokenExpiresAt: dto.tokenExpiresAt
@@ -206,8 +214,13 @@ export class PublishingService {
     return this.encryptionService.sanitizeAccount(account);
   }
 
-  async getAccounts() {
+  async getAccounts(userId?: string) {
+    const where: any = {};
+    if (userId) {
+      where.userId = userId;
+    }
     const accounts = await this.prisma.platformAccount.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
     });
 
@@ -221,9 +234,13 @@ export class PublishingService {
     });
   }
 
-  async getAccountById(id: string) {
-    const account = await this.prisma.platformAccount.findUnique({
-      where: { id },
+  async getAccountById(id: string, userId?: string) {
+    const where: any = { id };
+    if (userId) {
+      where.userId = userId;
+    }
+    const account = await this.prisma.platformAccount.findFirst({
+      where,
     });
     if (!account) {
       throw new NotFoundException(`Platform account with ID ${id} not found.`);
@@ -231,14 +248,14 @@ export class PublishingService {
     return this.encryptionService.sanitizeAccount(account);
   }
 
-  async deleteAccount(id: string) {
-    await this.getAccountById(id);
+  async deleteAccount(id: string, userId?: string) {
+    await this.getAccountById(id, userId);
     return this.prisma.platformAccount.delete({
       where: { id },
     });
   }
 
-  async getOAuthUrl(platform: PlatformType, redirectUri: string) {
+  async getOAuthUrl(platform: PlatformType, redirectUri: string, userId?: string) {
     const adapter = this.getAdapter(platform);
     if (!adapter.isConfigured()) {
       const missingKeys = adapter.getMissingConfig
@@ -256,19 +273,27 @@ export class PublishingService {
     if (!adapter.getAuthUrl) {
       throw new BadRequestException(`OAuth not supported for ${platform}`);
     }
-    return adapter.getAuthUrl(redirectUri);
+    const state = userId ? `${platform.toLowerCase()}_auth_${userId}` : `${platform.toLowerCase()}_auth`;
+    return adapter.getAuthUrl(redirectUri, state);
   }
 
   async handleOAuthCallback(
     platform: PlatformType,
     code: string,
     redirectUri: string,
+    userId?: string,
+    state?: string,
   ) {
     const adapter = this.getAdapter(platform);
     if (!adapter.handleCallback) {
       throw new BadRequestException(
         `OAuth callback not supported for ${platform}`,
       );
+    }
+
+    let targetUserId = userId;
+    if (!targetUserId && state && state.includes('_auth_')) {
+      targetUserId = state.split('_auth_')[1];
     }
 
     const tokenResult = await adapter.handleCallback(code, redirectUri);
@@ -285,6 +310,7 @@ export class PublishingService {
     }
 
     return this.createAccount({
+      userId: targetUserId,
       platform,
       accountName: tokenResult.accountName || `${platform} Account`,
       accountId: tokenResult.accountId,
@@ -292,7 +318,7 @@ export class PublishingService {
       refreshToken: tokenResult.refreshToken,
       tokenExpiresAt: tokenResult.expiresAt,
       metadata: tokenResult.metadata,
-    });
+    }, targetUserId);
   }
 
   // --- PUBLISHING JOBS ---
@@ -441,11 +467,17 @@ export class PublishingService {
     platform?: string;
     status?: string;
     videoId?: string;
+    userId?: string;
   }) {
     const where: any = {};
     if (filters?.platform) where.platform = filters.platform;
     if (filters?.status) where.status = filters.status;
     if (filters?.videoId) where.videoId = filters.videoId;
+    if (filters?.userId) {
+      where.platformAccount = {
+        userId: filters.userId,
+      };
+    }
 
     const jobs = await this.prisma.publishJob.findMany({
       where,

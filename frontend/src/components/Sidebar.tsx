@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import api from "@/lib/api";
 import {
   LayoutDashboard,
   Lightbulb,
@@ -15,7 +16,16 @@ import {
   ChevronRight,
   Share2,
   BarChart3,
+  User,
+  Users,
 } from "lucide-react";
+
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -27,6 +37,42 @@ export default function Sidebar() {
       return false;
     }
   });
+
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [activeUserId, setActiveUserId] = useState<string>("");
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await api.get("/auth/users");
+        const list: UserProfile[] = res.data || [];
+        setUsers(list);
+
+        let saved = localStorage.getItem("active_user_id");
+        if (!saved && list.length > 0) {
+          saved = list[0].id;
+          localStorage.setItem("active_user_id", saved);
+        }
+        if (saved) {
+          setActiveUserId(saved);
+        }
+      } catch (err) {
+        console.error("Failed to load users for sidebar switcher:", err);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  const handleUserChange = (userId: string) => {
+    setActiveUserId(userId);
+    try {
+      localStorage.setItem("active_user_id", userId);
+      window.dispatchEvent(new Event("active_user_changed"));
+    } catch {
+      // localStorage error
+    }
+  };
 
   const toggleCollapse = () => {
     setIsCollapsed((prev) => {
@@ -50,6 +96,8 @@ export default function Sidebar() {
     { name: "Phân tích (Analytics)", href: "/analytics", icon: BarChart3 },
     { name: "Cấu hình (Settings)", href: "/settings", icon: Settings },
   ];
+
+  const currentUser = users.find((u) => u.id === activeUserId);
 
   return (
     <aside
@@ -82,8 +130,40 @@ export default function Sidebar() {
         )}
       </div>
 
+      {/* Account Switcher Section */}
+      <div className={`p-3 border-b border-zinc-900 bg-zinc-900/30 ${isCollapsed ? "px-2" : "px-4"}`}>
+        {!isCollapsed ? (
+          <div>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Users className="w-3.5 h-3.5 text-violet-400" />
+              <label htmlFor="user-account-select" className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+                Tài khoản đăng nhập
+              </label>
+            </div>
+            <select
+              id="user-account-select"
+              value={activeUserId}
+              onChange={(e) => handleUserChange(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-md px-2.5 py-1.5 focus:outline-none focus:border-violet-500 cursor-pointer font-medium"
+            >
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name || u.email}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="flex justify-center" title={`Tài khoản hiện tại: ${currentUser?.name || "Tài khoản"}`}>
+            <div className="w-8 h-8 rounded-full bg-violet-900/50 border border-violet-700/50 text-violet-300 flex items-center justify-center font-bold text-xs">
+              {currentUser?.name ? currentUser.name.slice(-1) : <User className="w-4 h-4" />}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Navigation Links */}
-      <nav className={`flex-1 py-6 space-y-1 ${isCollapsed ? "px-2" : "px-4"}`}>
+      <nav className={`flex-1 py-4 space-y-1 ${isCollapsed ? "px-2" : "px-4"}`}>
         {menuItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (

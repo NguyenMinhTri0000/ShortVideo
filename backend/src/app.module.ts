@@ -14,6 +14,7 @@ import { ContentStrategyModule } from './modules/content-strategy/content-strate
 import { ScriptEngineModule } from './modules/script-engine/script-engine.module';
 import { PublishingModule } from './modules/publishing/publishing.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     ScriptEngineModule,
     PublishingModule,
     AnalyticsModule,
+    AuthModule,
   ],
 })
 export class AppModule {}

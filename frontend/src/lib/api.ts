@@ -7,4 +7,14 @@ const api = axios.create({
   },
 });
 
+api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const activeUserId = localStorage.getItem('active_user_id');
+    if (activeUserId) {
+      config.headers['x-user-id'] = activeUserId;
+    }
+  }
+  return config;
+});
+
 export default api;
